@@ -1,4 +1,5 @@
 import { EnemyStats, EnemyType, Position } from "../types";
+import { lineOfSight } from "../utils/collision";
 
 export class Enemy {
   position: Position;
@@ -14,6 +15,11 @@ export class Enemy {
   pathTimer: number;
   lastKnownPlayerPos: Position;
   huntingMode: "direct" | "flanking" | "ambush";
+  canSeePlayer: boolean;
+  wanderAngle: number;
+  wanderTimer: number;
+  previousPosition: Position;
+  stuckCounter: number;
 
   constructor(position: Position, stats: EnemyStats) {
     this.position = { ...position };
@@ -28,6 +34,11 @@ export class Enemy {
     this.velocity = { x: 0, y: 0 };
     this.pathTimer = 0;
     this.lastKnownPlayerPos = { x: 0, y: 0 };
+    this.canSeePlayer = false;
+    this.wanderAngle = Math.random() * Math.PI * 2;
+    this.wanderTimer = 0;
+    this.previousPosition = { ...position };
+    this.stuckCounter = 0;
 
     // Assign hunting behavior based on enemy type
     if (this.type === "Scout") {
@@ -39,15 +50,88 @@ export class Enemy {
     }
   }
 
-  update(deltaTime: number, playerPosition: Position, timestamp: number): void {
+  update(
+    deltaTime: number,
+    playerPosition: Position,
+    timestamp: number,
+    walls: Position[][]
+  ): void {
     if (!this.active) return;
 
     this.pathTimer += deltaTime;
+    this.wanderTimer += deltaTime;
 
-    // Save player's last known position
-    this.lastKnownPlayerPos = { ...playerPosition };
+    // Check if enemy can see player using line of sight
+    this.canSeePlayer = this.checkPlayerVisibility(playerPosition, walls);
 
-    // Calculate direction to player
+    // Save player's last known position if visible
+    if (this.canSeePlayer) {
+      this.lastKnownPlayerPos = { ...playerPosition };
+    }
+
+    // Calculate direction to player/target
+    const targetPos = this.canSeePlayer
+      ? playerPosition
+      : this.lastKnownPlayerPos;
+
+    // If in hunting mode, pursue player
+    if (this.canSeePlayer) {
+      this.huntPlayer(targetPos, deltaTime);
+    }
+    // Otherwise wander randomly
+    else {
+      this.wander(deltaTime);
+    }
+
+    // Store previous position to detect if stuck
+    const movedDistance = Math.sqrt(
+      Math.pow(this.position.x - this.previousPosition.x, 2) +
+        Math.pow(this.position.y - this.previousPosition.y, 2)
+    );
+
+    // Check if enemy is stuck (moving very little)
+    if (movedDistance < 0.5) {
+      this.stuckCounter += deltaTime;
+
+      // If stuck for more than 1 second, change direction
+      if (this.stuckCounter > 1) {
+        this.handleStuck();
+      }
+    } else {
+      this.stuckCounter = 0;
+    }
+
+    // Update previous position
+    this.previousPosition = { ...this.position };
+
+    // Enemies of the same type should avoid clustering too much
+    this.avoidClustering(deltaTime);
+  }
+
+  // Check if the enemy can see the player using line of sight
+  private checkPlayerVisibility(
+    playerPosition: Position,
+    walls: Position[][]
+  ): boolean {
+    // Vision range - how far the enemy can see
+    const visionRange = 400;
+
+    // Check distance to player first
+    const dx = playerPosition.x - this.position.x;
+    const dy = playerPosition.y - this.position.y;
+    const distanceToPlayer = Math.sqrt(dx * dx + dy * dy);
+
+    // If player is too far, no need to check line of sight
+    if (distanceToPlayer > visionRange) {
+      return false;
+    }
+
+    // Check line of sight between enemy and player
+    return lineOfSight(this.position, playerPosition, walls);
+  }
+
+  // Handle hunting behavior when player is visible
+  private huntPlayer(playerPosition: Position, deltaTime: number): void {
     const dx = playerPosition.x - this.position.x;
     const dy = playerPosition.y - this.position.y;
     const distance = Math.sqrt(dx * dx + dy * dy);
@@ -102,19 +186,55 @@ export class Enemy {
       this.velocity.y *= -0.5;
     }
 
-    // Increase speed temporarily when player is far away (catch-up mechanic)
-    if (distance > 300) {
-      const speedBoost = 1.2 + (distance - 300) / 700; // Up to 2x speed at 1000px away
-      this.velocity.x *= Math.min(speedBoost, 2.0);
-      this.velocity.y *= Math.min(speedBoost, 2.0);
+    // Move enemy
+    this.position.x += this.velocity.x * deltaTime;
+    this.position.y += this.velocity.y * deltaTime;
+  }
+
+  // Handle wandering behavior when player is not visible
+  private wander(deltaTime: number): void {
+    // Change direction randomly every 3-5 seconds
+    if (this.wanderTimer > 3 + Math.random() * 2) {
+      this.wanderTimer = 0;
+      this.wanderAngle = Math.random() * Math.PI * 2;
     }
+
+    // Calculate velocity based on wander angle
+    const wanderSpeed = this.speed * 0.6; // Slower when wandering
+    this.velocity = {
+      x: Math.cos(this.wanderAngle) * wanderSpeed,
+      y: Math.sin(this.wanderAngle) * wanderSpeed,
+    };
 
     // Move enemy
     this.position.x += this.velocity.x * deltaTime;
     this.position.y += this.velocity.y * deltaTime;
+  }
 
-    // Enemies of the same type should avoid clustering too much
-    this.avoidClustering(deltaTime);
+  // Handle situation when enemy is stuck
+  private handleStuck(): void {
+    // Reset stuck counter
+    this.stuckCounter = 0;
+
+    // Change direction dramatically
+    if (this.canSeePlayer) {
+      // If stuck while chasing player, try to move perpendicular
+      const dx = this.lastKnownPlayerPos.x - this.position.x;
+      const dy = this.lastKnownPlayerPos.y - this.position.y;
+      const distance = Math.sqrt(dx * dx + dy * dy);
+
+      if (distance > 0) {
+        // Move perpendicular to the direction to player
+        this.velocity = {
+          x: (-dy / distance) * this.speed,
+          y: (dx / distance) * this.speed,
+        };
+      }
+    } else {
+      // If stuck while wandering, pick a completely new direction
+      this.wanderAngle = Math.random() * Math.PI * 2;
+      this.wanderTimer = 0;
+    }
   }
 
   // Helper method to make enemies avoid grouping up too much
@@ -212,6 +332,15 @@ export class Enemy {
       screenY + Math.sin(moveDir) * (size / 2 + 5)
     );
     ctx.stroke();
+
+    // Indicate enemy state (hunting or wandering)
+    if (this.canSeePlayer) {
+      // Draw "alert" indicator around enemy
+      ctx.strokeStyle = "#FF9800"; // Orange for alert
+      ctx.beginPath();
+      ctx.arc(screenX, screenY, size + 5, 0, Math.PI * 2);
+      ctx.stroke();
+    }
   }
 
   private drawScout(

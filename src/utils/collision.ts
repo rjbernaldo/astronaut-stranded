@@ -9,8 +9,8 @@ export const circleCollision = (
   p2: Position,
   r2: number
 ): boolean => {
-  const dx = p2.x - p1.x;
-  const dy = p2.y - p1.y;
+  const dx = p1.x - p2.x;
+  const dy = p1.y - p2.y;
   const distance = Math.sqrt(dx * dx + dy * dy);
   return distance < r1 + r2;
 };
@@ -86,12 +86,12 @@ export const circleRectCollision = (
   );
 
   // Calculate the distance between the circle's center and this closest point
-  const distanceX = circlePos.x - closestX;
-  const distanceY = circlePos.y - closestY;
+  const dx = circlePos.x - closestX;
+  const dy = circlePos.y - closestY;
 
   // If the distance is less than the circle's radius, an intersection occurs
-  const distanceSquared = distanceX * distanceX + distanceY * distanceY;
-  return distanceSquared < radius * radius;
+  const distance = Math.sqrt(dx * dx + dy * dy);
+  return distance < radius;
 };
 
 /**
@@ -170,3 +170,73 @@ export const lineCircleIntersection = (
   // Check if the closest point is within the circle's radius
   return pointInCircle(closestPoint, circlePos, radius);
 };
+
+/**
+ * Check if there's a clear line of sight between two points
+ * @param start Starting position
+ * @param end End position
+ * @param walls Array of wall positions (each with 4 corner positions)
+ * @returns boolean indicating if there's a clear line of sight
+ */
+export function lineOfSight(
+  start: Position,
+  end: Position,
+  walls: Position[][]
+): boolean {
+  // For each wall, check if the line intersects with any of its edges
+  for (const wall of walls) {
+    // Skip if wall is not a quadrilateral (should have 4 vertices)
+    if (wall.length < 4) continue;
+
+    // Check intersection with each edge of the wall
+    for (let i = 0; i < wall.length; i++) {
+      const nextIndex = (i + 1) % wall.length;
+      const edge1 = wall[i];
+      const edge2 = wall[nextIndex];
+
+      // Check if the line from start to end intersects with this wall edge
+      if (lineIntersectsLine(start, end, edge1, edge2)) {
+        return false; // Wall is blocking line of sight
+      }
+    }
+  }
+
+  return true; // No walls blocking line of sight
+}
+
+/**
+ * Check if two line segments intersect
+ * @param a1 Start point of first line
+ * @param a2 End point of first line
+ * @param b1 Start point of second line
+ * @param b2 End point of second line
+ * @returns boolean indicating if the lines intersect
+ */
+function lineIntersectsLine(
+  a1: Position,
+  a2: Position,
+  b1: Position,
+  b2: Position
+): boolean {
+  // Calculate the direction vectors
+  const va = { x: a2.x - a1.x, y: a2.y - a1.y };
+  const vb = { x: b2.x - b1.x, y: b2.y - b1.y };
+
+  // Calculate the cross product of the direction vectors
+  const denominator = va.x * vb.y - va.y * vb.x;
+
+  // If the lines are parallel, they don't intersect
+  if (Math.abs(denominator) < 1e-8) {
+    return false;
+  }
+
+  // Calculate the vectors from a1 to b1
+  const v1 = { x: b1.x - a1.x, y: b1.y - a1.y };
+
+  // Calculate the parameters t and s for the parametric equations
+  const s = (v1.x * vb.y - v1.y * vb.x) / denominator;
+  const t = (v1.x * va.y - v1.y * va.x) / denominator;
+
+  // Check if the intersection point is within both line segments
+  return s >= 0 && s <= 1 && t >= 0 && t <= 1;
+}

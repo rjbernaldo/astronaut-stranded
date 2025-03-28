@@ -295,4 +295,33 @@ export class GameMap {
       }
     }
   }
+
+  // Add a method to get wall positions for collision detection and line of sight
+  getWalls(): Position[][] {
+    const walls: Position[][] = [];
+
+    // Convert tiles to wall polygons
+    this.tiles.forEach((row, y) => {
+      row.forEach((tile, x) => {
+        // Skip non-wall tiles
+        if (tile.type !== "wall") return;
+
+        // Convert tile to world coordinates
+        const tileX = x * this.tileSize;
+        const tileY = y * this.tileSize;
+
+        // Create a polygon for the wall (4 corners)
+        const wallPolygon: Position[] = [
+          { x: tileX, y: tileY }, // Top-left
+          { x: tileX + this.tileSize, y: tileY }, // Top-right
+          { x: tileX + this.tileSize, y: tileY + this.tileSize }, // Bottom-right
+          { x: tileX, y: tileY + this.tileSize }, // Bottom-left
+        ];
+
+        walls.push(wallPolygon);
+      });
+    });
+
+    return walls;
+  }
 }

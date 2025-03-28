@@ -159,7 +159,7 @@ export class Astronaut {
     this.health = Math.max(0, this.health - amount);
   }
 
-  update(deltaTime: number, timestamp: number): void {
-    // Empty update - removed flashlight functionality
+  update(): void {
+    // Empty update method - flashlight functionality was removed
   }
 }
