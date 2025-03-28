@@ -1,0 +1,130 @@
+.main {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100vh;
+  width: 100vw;
+  background-color: #000;
+  color: #fff;
+  padding: 0;
+  margin: 0;
+  overflow: hidden;
+  font-family: monospace;
+  position: relative;
+}
+
+.startScreen {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  max-width: 1000px;
+  padding: 2rem;
+  background-color: rgba(0, 0, 0, 0.8);
+  border: 1px solid #39ff14;
+  border-radius: 5px;
+  box-shadow: 0 0 20px rgba(57, 255, 20, 0.3);
+  text-align: center;
+  /* CRT scan lines effect */
+  background-image: linear-gradient(transparent 50%, rgba(0, 0, 0, 0.1) 50%);
+  background-size: 100% 4px;
+}
+
+.title {
+  font-size: 3rem;
+  font-weight: bold;
+  margin-bottom: 1rem;
+  color: #39ff14;
+  text-shadow: 0 0 10px rgba(57, 255, 20, 0.7);
+  letter-spacing: 3px;
+}
+
+.description {
+  font-size: 1.2rem;
+  margin-bottom: 2rem;
+  max-width: 700px;
+  color: #ccc;
+}
+
+.instructionsContainer {
+  display: flex;
+  justify-content: space-between;
+  width: 100%;
+  margin-bottom: 2rem;
+  flex-wrap: wrap;
+}
+
+.instructionsColumn {
+  flex: 1;
+  min-width: 200px;
+  margin: 0 1rem 1rem;
+  text-align: left;
+}
+
+.instructionsColumn h2 {
+  color: #39ff14;
+  font-size: 1.5rem;
+  margin-bottom: 1rem;
+  border-bottom: 1px solid #39ff14;
+  padding-bottom: 0.5rem;
+}
+
+.instructionsColumn ul {
+  list-style-type: none;
+  padding: 0;
+}
+
+.instructionsColumn li {
+  margin-bottom: 0.5rem;
+  font-size: 1rem;
+  color: #ccc;
+}
+
+.startButton {
+  padding: 1rem 2rem;
+  font-size: 1.5rem;
+  background-color: #000;
+  color: #39ff14;
+  border: 2px solid #39ff14;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  font-family: monospace;
+  font-weight: bold;
+  letter-spacing: 2px;
+  margin-bottom: 2rem;
+}
+
+.startButton:hover {
+  background-color: #39ff14;
+  color: #000;
+  box-shadow: 0 0 15px rgba(57, 255, 20, 0.7);
+}
+
+.footer {
+  font-size: 0.9rem;
+  color: #666;
+  margin-top: 1rem;
+}
+
+@media (max-width: 768px) {
+  .title {
+    font-size: 2rem;
+  }
+
+  .description {
+    font-size: 1rem;
+  }
+
+  .instructionsContainer {
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .instructionsColumn {
+    margin-bottom: 1.5rem;
+    text-align: center;
+  }
+}
