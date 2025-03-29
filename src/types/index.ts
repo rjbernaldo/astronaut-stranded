@@ -39,4 +39,14 @@ export interface EnemyStats {
   attackRange: number;
   attackDamage: number;
   attackSpeed: number; // in seconds
+  level: number; // Added level for difficulty scaling
+}
+
+export interface GameState {
+  score: number;
+  isGameOver: boolean;
+  waveNumber: number;
+  difficultyLevel: number; // Added to track current difficulty level
+  gameTime: number; // Track elapsed game time in seconds
+  nextLevelTime: number; // Time until the next difficulty level increase
 }

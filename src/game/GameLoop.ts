@@ -2,16 +2,12 @@ import { Astronaut } from "./Astronaut";
 import { Enemy } from "./Enemy";
 import { GameMap } from "./Map";
 import { Projectile } from "./Projectile";
-import { Position, EnemyStats } from "../types";
+import { Position, EnemyStats, EnemyType, GameState } from "../types";
 import seedrandom from "seedrandom";
 
-export interface GameState {
-  isGameOver: boolean;
-  hasWon: boolean;
-  score: number;
-  waveNumber: number;
-  timeElapsed: number;
-}
+// Constants for difficulty scaling
+const DIFFICULTY_INCREASE_TIME = 60; // Seconds between difficulty increases
+const INITIAL_DIFFICULTY = 1;
 
 export class GameLoop {
   private canvas: HTMLCanvasElement;
@@ -33,11 +29,12 @@ export class GameLoop {
   private enemySpawnCount: number = 5;
 
   private gameState: GameState = {
-    isGameOver: false,
-    hasWon: false,
     score: 0,
+    isGameOver: false,
     waveNumber: 1,
-    timeElapsed: 0,
+    difficultyLevel: INITIAL_DIFFICULTY,
+    gameTime: 0,
+    nextLevelTime: DIFFICULTY_INCREASE_TIME,
   };
 
   constructor(canvas: HTMLCanvasElement) {
@@ -143,7 +140,7 @@ export class GameLoop {
     if (this.gameState.isGameOver) return;
 
     // Update game time
-    this.gameState.timeElapsed += deltaTime;
+    this.gameState.gameTime += deltaTime;
 
     // Handle player input
     this.handleInput(deltaTime, timestamp);
@@ -158,7 +155,6 @@ export class GameLoop {
 
     // Check if player reached the exit
     if (this.map.isTileExit(this.player.position.x, this.player.position.y)) {
-      this.gameState.hasWon = true;
       this.gameState.isGameOver = true;
       return;
     }
@@ -189,6 +185,9 @@ export class GameLoop {
     if (this.player.health <= 0) {
       this.gameState.isGameOver = true;
     }
+
+    // Update game state (difficulty, time, etc.)
+    this.updateGameState(deltaTime);
   }
 
   private handleInput(deltaTime: number, timestamp: number): void {
@@ -360,68 +359,108 @@ export class GameLoop {
       2000
     );
 
-    // Spawn enemies
+    // Calculate the view range (slightly larger than canvas)
+    const viewRangeX = this.canvas.width * 0.7;
+    const viewRangeY = this.canvas.height * 0.7;
+
     for (let i = 0; i < this.enemySpawnCount; i++) {
-      // Spawn outside player's view but not too far
-      const angle = this.rng() * Math.PI * 2;
-      const distance = 300 + this.rng() * 200; // Just outside light radius
+      // Generate a position outside of the player's view
+      let spawnX: number;
+      let spawnY: number;
+      let isOutsideView = false;
 
-      const spawnX = this.player.position.x + Math.cos(angle) * distance;
-      const spawnY = this.player.position.y + Math.sin(angle) * distance;
+      // Keep trying until we get a position outside of view range
+      while (!isOutsideView) {
+        // Determine spawn direction (from which edge)
+        const spawnDirection = Math.floor(Math.random() * 4); // 0: top, 1: right, 2: bottom, 3: left
 
-      // Skip if spawn position is a wall
-      if (!this.map.isTileWalkable(spawnX, spawnY)) continue;
+        // Calculate base spawn position depending on direction
+        switch (spawnDirection) {
+          case 0: // Top
+            spawnX =
+              this.player.position.x + (Math.random() * 2 - 1) * viewRangeX;
+            spawnY = this.player.position.y - viewRangeY - Math.random() * 200;
+            break;
+          case 1: // Right
+            spawnX = this.player.position.x + viewRangeX + Math.random() * 200;
+            spawnY =
+              this.player.position.y + (Math.random() * 2 - 1) * viewRangeY;
+            break;
+          case 2: // Bottom
+            spawnX =
+              this.player.position.x + (Math.random() * 2 - 1) * viewRangeX;
+            spawnY = this.player.position.y + viewRangeY + Math.random() * 200;
+            break;
+          case 3: // Left
+            spawnX = this.player.position.x - viewRangeX - Math.random() * 200;
+            spawnY =
+              this.player.position.y + (Math.random() * 2 - 1) * viewRangeY;
+            break;
+        }
 
-      // Determine enemy type based on wave number
-      let enemyType: "Scout" | "Brute" | "Spitter";
-      const typeRoll = this.rng();
+        // Ensure the position is walkable
+        if (this.map.isTileWalkable(spawnX, spawnY)) {
+          // Check that it's really outside the view
+          const distX = Math.abs(spawnX - this.player.position.x);
+          const distY = Math.abs(spawnY - this.player.position.y);
 
-      if (this.gameState.waveNumber < 3) {
-        enemyType = "Scout"; // Only scouts in early waves
-      } else if (this.gameState.waveNumber < 5) {
-        enemyType = typeRoll < 0.7 ? "Scout" : "Spitter";
-      } else {
-        if (typeRoll < 0.6) {
-          enemyType = "Scout";
-        } else if (typeRoll < 0.9) {
-          enemyType = "Spitter";
-        } else {
-          enemyType = "Brute";
+          if (distX > viewRangeX || distY > viewRangeY) {
+            isOutsideView = true;
+          }
         }
       }
 
-      // Create enemy stats based on type
+      // Determine enemy type
+      let enemyType: EnemyType;
+      const typeRoll = Math.random();
+
+      if (typeRoll < 0.5) {
+        enemyType = "Scout";
+      } else if (typeRoll < 0.8) {
+        enemyType = "Brute";
+      } else {
+        enemyType = "Spitter";
+      }
+
+      // Create enemy stats based on current difficulty level
       let stats: EnemyStats;
+
+      // Apply difficulty scaling to stats
+      const difficultyMultiplier =
+        1 + (this.gameState.difficultyLevel - 1) * 0.2;
 
       switch (enemyType) {
         case "Scout":
           stats = {
             type: "Scout",
-            health: 20,
-            speed: this.player.speed * 0.8, // 80% of player's speed
+            health: 20 * difficultyMultiplier,
+            speed: this.player.speed * 0.8,
             attackRange: 20,
-            attackDamage: 10,
+            attackDamage: 10 * difficultyMultiplier,
             attackSpeed: 1,
+            level: this.gameState.difficultyLevel,
           };
           break;
         case "Brute":
           stats = {
             type: "Brute",
-            health: 50,
-            speed: this.player.speed * 0.6, // 60% of player's speed (slower)
+            health: 50 * difficultyMultiplier,
+            speed: this.player.speed * 0.6,
             attackRange: 25,
-            attackDamage: 20,
+            attackDamage: 20 * difficultyMultiplier,
             attackSpeed: 2,
+            level: this.gameState.difficultyLevel,
           };
           break;
         case "Spitter":
           stats = {
             type: "Spitter",
-            health: 30,
-            speed: this.player.speed * 0.7, // 70% of player's speed
-            attackRange: 100, // Ranged attack
-            attackDamage: 5,
+            health: 30 * difficultyMultiplier,
+            speed: this.player.speed * 0.7,
+            attackRange: 100,
+            attackDamage: 5 * difficultyMultiplier,
             attackSpeed: 1.5,
+            level: this.gameState.difficultyLevel,
           };
           break;
       }
@@ -534,6 +573,51 @@ export class GameLoop {
       `Health: ${Math.floor(this.player.health)}`,
       padding + 10,
       padding + 15
+    );
+
+    // Draw difficulty information (left side)
+    const diffBarY = padding + barHeight + 10;
+    this.ctx.fillStyle = "#333333";
+    this.ctx.fillRect(padding, diffBarY, barWidth, barHeight);
+
+    // Calculate time progress for next level
+    const timeProgress =
+      1 - this.gameState.nextLevelTime / DIFFICULTY_INCREASE_TIME;
+
+    // Draw difficulty progress bar
+    this.ctx.fillStyle = "#8844FF";
+    this.ctx.fillRect(padding, diffBarY, barWidth * timeProgress, barHeight);
+    this.ctx.strokeStyle = "#FFFFFF";
+    this.ctx.strokeRect(padding, diffBarY, barWidth, barHeight);
+
+    // Draw difficulty text
+    this.ctx.fillStyle = "#FFFFFF";
+    this.ctx.font = "16px monospace";
+    this.ctx.textAlign = "left";
+    this.ctx.fillText(
+      `Difficulty: ${this.gameState.difficultyLevel}`,
+      padding + 10,
+      diffBarY + 15
+    );
+
+    // Draw time info
+    const minutes = Math.floor(this.gameState.gameTime / 60);
+    const seconds = Math.floor(this.gameState.gameTime % 60);
+    const timeNextLevel = Math.max(0, Math.ceil(this.gameState.nextLevelTime));
+
+    this.ctx.fillStyle = "#FFFFFF";
+    this.ctx.font = "16px monospace";
+    this.ctx.textAlign = "left";
+    this.ctx.fillText(
+      `Time: ${minutes}:${seconds.toString().padStart(2, "0")}`,
+      padding,
+      diffBarY + barHeight + 20
+    );
+
+    this.ctx.fillText(
+      `Next level: ${timeNextLevel}s`,
+      padding,
+      diffBarY + barHeight + 40
     );
 
     // Draw ammo counter
@@ -664,7 +748,7 @@ export class GameLoop {
     this.ctx.textAlign = "center";
     this.ctx.textBaseline = "middle";
 
-    if (this.gameState.hasWon) {
+    if (this.gameState.isGameOver) {
       this.ctx.fillText("MISSION COMPLETE", centerX, centerY - 50);
       this.ctx.font = "24px monospace";
       this.ctx.fillText("You escaped the alien planet", centerX, centerY);
@@ -686,5 +770,25 @@ export class GameLoop {
     // Restart prompt
     this.ctx.font = "16px monospace";
     this.ctx.fillText("Refresh the page to play again", centerX, centerY + 150);
+  }
+
+  private updateGameState(deltaTime: number): void {
+    // Update game time (convert deltaTime from ms to seconds)
+    this.gameState.gameTime += deltaTime;
+
+    // Update time until next difficulty level
+    this.gameState.nextLevelTime -= deltaTime;
+
+    // Check if it's time to increase difficulty
+    if (this.gameState.nextLevelTime <= 0) {
+      this.gameState.difficultyLevel += 1;
+      this.gameState.nextLevelTime = DIFFICULTY_INCREASE_TIME;
+
+      // Every 3 levels, increase spawn rate and count
+      if (this.gameState.difficultyLevel % 3 === 0) {
+        this.enemySpawnInterval = Math.max(0.5, this.enemySpawnInterval * 0.9);
+        this.enemySpawnCount += 1;
+      }
+    }
   }
 }

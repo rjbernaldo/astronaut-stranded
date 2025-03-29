@@ -16,7 +16,7 @@ export class Projectile {
     this.range = options.range;
     this.distanceTraveled = 0;
     this.active = true;
-    this.speed = options.speed;
+    this.speed = options.speed * 2.5;
   }
 
   update(deltaTime: number): void {
@@ -48,24 +48,24 @@ export class Projectile {
     const renderY = screenPosition ? screenPosition.y : this.position.y;
 
     // Draw projectile
-    ctx.fillStyle = "#FFDD33";
+    ctx.fillStyle = "#FFEE44";
     ctx.beginPath();
-    ctx.arc(renderX, renderY, 3, 0, Math.PI * 2); // Increased size slightly to make bullets more visible
+    ctx.arc(renderX, renderY, 4, 0, Math.PI * 2);
     ctx.fill();
 
     // Add tracer effect
-    const tracerLength = 10; // Increased tracer length for better visibility
+    const tracerLength = 15;
     const tracer = ctx.createLinearGradient(
       renderX,
       renderY,
       renderX - (this.velocity.x * tracerLength) / this.speed,
       renderY - (this.velocity.y * tracerLength) / this.speed
     );
-    tracer.addColorStop(0, "rgba(255, 221, 51, 1)");
-    tracer.addColorStop(1, "rgba(255, 221, 51, 0)");
+    tracer.addColorStop(0, "rgba(255, 238, 68, 1)");
+    tracer.addColorStop(1, "rgba(255, 238, 68, 0)");
 
     ctx.strokeStyle = tracer;
-    ctx.lineWidth = 2; // Increased line width for better visibility
+    ctx.lineWidth = 3;
     ctx.beginPath();
     ctx.moveTo(renderX, renderY);
     ctx.lineTo(

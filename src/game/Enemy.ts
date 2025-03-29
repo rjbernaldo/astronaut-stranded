@@ -17,6 +17,7 @@ export class Enemy {
   targetVelocity: Position;
   smoothingFactor: number;
   movementHistory: Position[];
+  level: number;
 
   constructor(position: Position, stats: EnemyStats) {
     this.position = { ...position };
@@ -34,6 +35,7 @@ export class Enemy {
     this.pathTimer = 0;
     this.lastKnownPlayerPos = { x: 0, y: 0 };
     this.movementHistory = []; // Store recent positions to detect stalling
+    this.level = stats.level;
 
     // Assign hunting behavior based on enemy type
     if (this.type === "Scout") {
@@ -251,6 +253,16 @@ export class Enemy {
     }
 
     ctx.fill();
+
+    // Draw enemy name and level
+    ctx.fillStyle = "#FFFFFF";
+    ctx.font = "10px monospace";
+    ctx.textAlign = "center";
+    ctx.fillText(
+      `${this.type} Lvl ${this.level}`,
+      screenX,
+      screenY - size - 15
+    );
 
     // Draw health indicator
     const healthPercent = this.health / this.getMaxHealth();
