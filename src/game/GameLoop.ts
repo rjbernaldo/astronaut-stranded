@@ -685,57 +685,173 @@ export class GameLoop {
     this.ctx.strokeStyle = "#FFFFFF";
     this.ctx.strokeRect(x, y, width, height);
 
-    // Draw player position
-    const mapRatio = 10000 / width; // Map size to mini-map size
-    const playerX = x + this.player.position.x / mapRatio;
-    const playerY = y + this.player.position.y / mapRatio;
+    // Save context to restore later
+    this.ctx.save();
 
-    this.ctx.fillStyle = "#FFFFFF";
+    // Create clipping region for the minimap
     this.ctx.beginPath();
-    this.ctx.arc(playerX, playerY, 3, 0, Math.PI * 2);
-    this.ctx.fill();
+    this.ctx.rect(x, y, width, height);
+    this.ctx.clip();
+
+    // Calculate minimap scale (how much to zoom in/out)
+    const scale = 0.05; // Smaller value = more zoomed out view
+
+    // Calculate the top-left corner of the visible area
+    // This keeps the player centered in the minimap
+    const mapCenterX = x + width / 2;
+    const mapCenterY = y + height / 2;
+
+    // Draw map tiles within visible area
+    const tileSize = this.map.tileSize * scale;
+    const visibleTilesX = Math.ceil(width / tileSize) + 2;
+    const visibleTilesY = Math.ceil(height / tileSize) + 2;
+
+    // Calculate the starting tile coordinates
+    const startTileX = Math.floor(
+      this.player.position.x / this.map.tileSize - visibleTilesX / 2
+    );
+    const startTileY = Math.floor(
+      this.player.position.y / this.map.tileSize - visibleTilesY / 2
+    );
+
+    // Draw visible tiles
+    for (let ty = 0; ty < visibleTilesY; ty++) {
+      for (let tx = 0; tx < visibleTilesX; tx++) {
+        const tileX = startTileX + tx;
+        const tileY = startTileY + ty;
+
+        // Skip tiles outside the map bounds
+        if (
+          tileX < 0 ||
+          tileX >= this.map.width ||
+          tileY < 0 ||
+          tileY >= this.map.height
+        ) {
+          continue;
+        }
+
+        // Get tile type
+        const tile = this.map.tiles[tileY][tileX];
+
+        // Calculate screen position for this tile
+        const screenX =
+          mapCenterX +
+          (tileX * this.map.tileSize - this.player.position.x) * scale;
+        const screenY =
+          mapCenterY +
+          (tileY * this.map.tileSize - this.player.position.y) * scale;
+
+        // Draw tile with color based on type
+        if (tile.type === "floor") {
+          this.ctx.fillStyle = "#333333"; // Dark gray for floor
+        } else if (tile.type === "wall") {
+          this.ctx.fillStyle = "#666666"; // Light gray for walls
+        } else if (tile.type === "exit") {
+          this.ctx.fillStyle = "#4444AA"; // Blue for exit
+        }
+
+        this.ctx.fillRect(screenX, screenY, tileSize, tileSize);
+      }
+    }
 
     // Draw exit position
-    const exitX = x + this.map.exitPosition.x / mapRatio;
-    const exitY = y + this.map.exitPosition.y / mapRatio;
+    const exitX =
+      mapCenterX + (this.map.exitPosition.x - this.player.position.x) * scale;
+    const exitY =
+      mapCenterY + (this.map.exitPosition.y - this.player.position.y) * scale;
 
-    this.ctx.fillStyle = "#4444FF";
-    this.ctx.beginPath();
-    this.ctx.arc(exitX, exitY, 3, 0, Math.PI * 2);
-    this.ctx.fill();
+    // Only draw if exit is visible on minimap
+    if (exitX >= x && exitX <= x + width && exitY >= y && exitY <= y + height) {
+      this.ctx.fillStyle = "#4444FF";
+      this.ctx.beginPath();
+      this.ctx.arc(exitX, exitY, 4, 0, Math.PI * 2);
+      this.ctx.fill();
+    } else {
+      // Draw arrow toward exit if off-screen
+      const angleToExit = Math.atan2(
+        this.map.exitPosition.y - this.player.position.y,
+        this.map.exitPosition.x - this.player.position.x
+      );
 
-    // Draw line pointing to exit
-    this.ctx.strokeStyle = "rgba(68, 68, 255, 0.5)";
-    this.ctx.lineWidth = 1;
-    this.ctx.beginPath();
-    this.ctx.moveTo(playerX, playerY);
-    this.ctx.lineTo(exitX, exitY);
-    this.ctx.stroke();
+      // Draw arrow on the minimap edge
+      const arrowX = mapCenterX + Math.cos(angleToExit) * (width * 0.4);
+      const arrowY = mapCenterY + Math.sin(angleToExit) * (height * 0.4);
+
+      this.ctx.fillStyle = "#4444FF";
+      this.ctx.beginPath();
+      this.ctx.arc(arrowX, arrowY, 3, 0, Math.PI * 2);
+      this.ctx.fill();
+
+      // Draw line pointing toward exit
+      this.ctx.strokeStyle = "rgba(68, 68, 255, 0.5)";
+      this.ctx.lineWidth = 1;
+      this.ctx.beginPath();
+      this.ctx.moveTo(mapCenterX, mapCenterY);
+      this.ctx.lineTo(arrowX, arrowY);
+      this.ctx.stroke();
+    }
 
     // Draw enemies on minimap
     for (const enemy of this.enemies) {
       if (!enemy.active) continue;
 
-      const enemyX = x + enemy.position.x / mapRatio;
-      const enemyY = y + enemy.position.y / mapRatio;
+      const enemyX =
+        mapCenterX + (enemy.position.x - this.player.position.x) * scale;
+      const enemyY =
+        mapCenterY + (enemy.position.y - this.player.position.y) * scale;
 
-      // Different colors for different enemy types
-      switch (enemy.type) {
-        case "Scout":
-          this.ctx.fillStyle = "#4CAF50"; // Green
-          break;
-        case "Brute":
-          this.ctx.fillStyle = "#F44336"; // Red
-          break;
-        case "Spitter":
-          this.ctx.fillStyle = "#9C27B0"; // Purple
-          break;
+      // Only draw enemies that are visible on minimap
+      if (
+        enemyX >= x &&
+        enemyX <= x + width &&
+        enemyY >= y &&
+        enemyY <= y + height
+      ) {
+        // Different colors for different enemy types
+        switch (enemy.type) {
+          case "Scout":
+            this.ctx.fillStyle = "#4CAF50"; // Green
+            break;
+          case "Brute":
+            this.ctx.fillStyle = "#F44336"; // Red
+            break;
+          case "Spitter":
+            this.ctx.fillStyle = "#9C27B0"; // Purple
+            break;
+        }
+
+        this.ctx.beginPath();
+        this.ctx.arc(enemyX, enemyY, 2, 0, Math.PI * 2);
+        this.ctx.fill();
       }
-
-      this.ctx.beginPath();
-      this.ctx.arc(enemyX, enemyY, 2, 0, Math.PI * 2);
-      this.ctx.fill();
     }
+
+    // Draw player position (always at center)
+    this.ctx.fillStyle = "#FFFFFF";
+    this.ctx.beginPath();
+    this.ctx.arc(mapCenterX, mapCenterY, 3, 0, Math.PI * 2);
+    this.ctx.fill();
+
+    // Draw player direction
+    const radians = (this.player.rotation * Math.PI) / 180;
+    const dirX = mapCenterX + Math.cos(radians) * 5;
+    const dirY = mapCenterY + Math.sin(radians) * 5;
+
+    this.ctx.strokeStyle = "#FFFFFF";
+    this.ctx.lineWidth = 1;
+    this.ctx.beginPath();
+    this.ctx.moveTo(mapCenterX, mapCenterY);
+    this.ctx.lineTo(dirX, dirY);
+    this.ctx.stroke();
+
+    // Draw a "N" for North orientation
+    this.ctx.fillStyle = "#FFFFFF";
+    this.ctx.font = "10px monospace";
+    this.ctx.textAlign = "center";
+    this.ctx.fillText("N", x + width - 10, y + 12);
+
+    // Restore context
+    this.ctx.restore();
   }
 
   private renderGameOver(): void {
