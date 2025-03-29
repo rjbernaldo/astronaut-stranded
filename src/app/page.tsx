@@ -9,7 +9,6 @@ import "./gun-customization.css";
 export default function Home() {
   const [gameStarted, setGameStarted] = useState(false);
   const [showGunCustomization, setShowGunCustomization] = useState(false);
-  const [playerCredits, setPlayerCredits] = useState(100);
   const [weaponStats, setWeaponStats] = useState<WeaponStats | null>(null);
 
   const handleStartGame = () => {
@@ -33,7 +32,6 @@ export default function Home() {
     return (
       <GunCustomization
         initialWeaponStats={weaponStats}
-        playerCredits={playerCredits}
         onSave={handleSaveCustomization}
         onCancel={handleCancelCustomization}
       />
