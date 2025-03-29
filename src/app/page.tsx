@@ -26,19 +26,47 @@ export default function Home() {
             <h2 className={styles.inventoryTitle}>INVENTORY</h2>
             <div className={styles.inventoryGrid}>
               <div className={styles.inventorySlot}></div>
-              <div className={styles.glockItem}>
+              <div className={`${styles.gunPartSlot} ${styles.gunSlideSlot}`}>
                 <Image
-                  src="/images/glock.svg"
-                  alt="Glock"
-                  width={120}
-                  height={80}
-                  className={styles.glockImage}
+                  src="/images/gun-slide.svg"
+                  alt="Gun Slide"
+                  width={60}
+                  height={40}
+                  className={styles.gunPartImage}
+                />
+              </div>
+              <div className={`${styles.gunPartSlot} ${styles.gunBarrelSlot}`}>
+                <Image
+                  src="/images/gun-barrel.svg"
+                  alt="Gun Barrel"
+                  width={40}
+                  height={40}
+                  className={styles.gunPartImage}
+                />
+              </div>
+              <div className={styles.inventorySlot}></div>
+              <div className={styles.inventorySlot}></div>
+              <div className={`${styles.gunPartSlot} ${styles.gunFrameSlot}`}>
+                <Image
+                  src="/images/gun-frame.svg"
+                  alt="Gun Frame"
+                  width={40}
+                  height={40}
+                  className={styles.gunPartImage}
                 />
               </div>
               <div className={styles.inventorySlot}></div>
               <div className={styles.inventorySlot}></div>
               <div className={styles.inventorySlot}></div>
-              <div className={styles.inventorySlot}></div>
+              <div className={`${styles.gunPartSlot} ${styles.gunGripSlot}`}>
+                <Image
+                  src="/images/gun-grip.svg"
+                  alt="Gun Grip"
+                  width={40}
+                  height={40}
+                  className={styles.gunPartImage}
+                />
+              </div>
               <div className={styles.inventorySlot}></div>
               <div className={styles.inventorySlot}></div>
               <div className={styles.inventorySlot}></div>
