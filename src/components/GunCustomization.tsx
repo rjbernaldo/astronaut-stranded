@@ -512,18 +512,24 @@ const defaultEquippedParts = {
   internal: "standard-internal",
 };
 
-export interface GunCustomizationProps {
-  onSave: (stats: WeaponStats) => void;
+interface GunCustomizationProps {
+  availableCredits: number;
+  initialWeaponStats: WeaponStats;
+  onSave: (
+    equippedParts: Partial<Record<PartCategory, string>>,
+    finalStats: WeaponStats
+  ) => void;
   onCancel: () => void;
-  initialWeaponStats?: WeaponStats | null;
+  isOpen: boolean;
 }
 
-const GunCustomization: React.FC<GunCustomizationProps> = ({
+export const GunCustomization: React.FC<GunCustomizationProps> = ({
+  availableCredits,
+  initialWeaponStats,
   onSave,
   onCancel,
-  initialWeaponStats,
+  isOpen,
 }) => {
-  // Remove selectedCategory since we're showing all parts
   const [gunParts, setGunParts] = useState<GunPart[]>([]);
   const [equippedParts, setEquippedParts] =
     useState<Record<PartCategory, string>>(defaultEquippedParts);
@@ -1216,8 +1222,8 @@ const GunCustomization: React.FC<GunCustomizationProps> = ({
         <div className="gun-image">
           {/* Base pistol image */}
           <svg
-            width="350"
-            height="250"
+            width="300"
+            height="220"
             viewBox="0 0 400 300"
             fill="none"
             xmlns="http://www.w3.org/2000/svg"
@@ -1602,97 +1608,256 @@ const GunCustomization: React.FC<GunCustomizationProps> = ({
     setGunParts([...standardParts, ...currentEquipped, ...newRandomParts]);
   };
 
+  // Add effect to handle ESC key to close modal
+  useEffect(() => {
+    const handleEscapeKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        onCancel();
+      }
+    };
+
+    if (isOpen) {
+      window.addEventListener("keydown", handleEscapeKey);
+    }
+
+    return () => {
+      window.removeEventListener("keydown", handleEscapeKey);
+    };
+  }, [isOpen, onCancel]);
+
+  // Handle saving changes
+  const handleSave = () => {
+    onSave(equippedParts, getFinalWeaponStats());
+  };
+
+  // Filter parts to only show unequipped and non-standard parts
+  const filteredGunParts = gunParts
+    .filter(
+      (part) =>
+        !part.id.startsWith("standard-") &&
+        !Object.values(equippedParts).includes(part.id)
+    )
+    .slice(0, 3);
+
+  // Render weapon stats with numerical values
+  const renderWeaponStats = () => {
+    return (
+      <div className="stat-values">
+        <div className="stat-row">
+          <span className="stat-label">Damage:</span>
+          <span className="stat-value">
+            {Math.floor(gunStats.damage)}
+            {previewStats && previewStats.damage !== gunStats.damage && (
+              <span
+                className={
+                  previewStats.damage > gunStats.damage
+                    ? "stat-increase"
+                    : "stat-decrease"
+                }
+              >
+                {" "}
+                ({previewStats.damage > gunStats.damage ? "+" : ""}
+                {Math.floor((previewStats.damage - gunStats.damage) * 100) /
+                  100}
+                )
+              </span>
+            )}
+          </span>
+        </div>
+
+        <div className="stat-row">
+          <span className="stat-label">Accuracy:</span>
+          <span className="stat-value">
+            {Math.floor(gunStats.accuracy)}
+            {previewStats && previewStats.accuracy !== gunStats.accuracy && (
+              <span
+                className={
+                  previewStats.accuracy > gunStats.accuracy
+                    ? "stat-increase"
+                    : "stat-decrease"
+                }
+              >
+                {" "}
+                ({previewStats.accuracy > gunStats.accuracy ? "+" : ""}
+                {Math.floor((previewStats.accuracy - gunStats.accuracy) * 100) /
+                  100}
+                )
+              </span>
+            )}
+          </span>
+        </div>
+
+        <div className="stat-row">
+          <span className="stat-label">Range:</span>
+          <span className="stat-value">
+            {Math.floor(gunStats.range)}
+            {previewStats && previewStats.range !== gunStats.range && (
+              <span
+                className={
+                  previewStats.range > gunStats.range
+                    ? "stat-increase"
+                    : "stat-decrease"
+                }
+              >
+                {" "}
+                ({previewStats.range > gunStats.range ? "+" : ""}
+                {Math.floor((previewStats.range - gunStats.range) * 100) / 100})
+              </span>
+            )}
+          </span>
+        </div>
+
+        <div className="stat-row">
+          <span className="stat-label">Fire Rate:</span>
+          <span className="stat-value">
+            {Math.floor(gunStats.fireRate)}
+            {previewStats && previewStats.fireRate !== gunStats.fireRate && (
+              <span
+                className={
+                  previewStats.fireRate > gunStats.fireRate
+                    ? "stat-increase"
+                    : "stat-decrease"
+                }
+              >
+                {" "}
+                ({previewStats.fireRate > gunStats.fireRate ? "+" : ""}
+                {Math.floor((previewStats.fireRate - gunStats.fireRate) * 100) /
+                  100}
+                )
+              </span>
+            )}
+          </span>
+        </div>
+
+        <div className="stat-row">
+          <span className="stat-label">Reload Speed:</span>
+          <span className="stat-value">
+            {Math.floor(gunStats.reloadSpeed)}
+            {previewStats && previewStats.reloadSpeed !== gunStats.reloadSpeed && (
+              <span
+                className={
+                  previewStats.reloadSpeed > gunStats.reloadSpeed
+                    ? "stat-increase"
+                    : "stat-decrease"
+                }
+              >
+                {" "}
+                ({previewStats.reloadSpeed > gunStats.reloadSpeed ? "+" : ""}
+                {Math.floor(
+                  (previewStats.reloadSpeed - gunStats.reloadSpeed) * 100
+                ) / 100}
+                )
+              </span>
+            )}
+          </span>
+        </div>
+
+        <div className="stat-row">
+          <span className="stat-label">Recoil Control:</span>
+          <span className="stat-value">
+            {Math.floor(gunStats.recoil)}
+            {previewStats && previewStats.recoil !== gunStats.recoil && (
+              <span
+                className={
+                  previewStats.recoil > gunStats.recoil
+                    ? "stat-increase"
+                    : "stat-decrease"
+                }
+              >
+                {" "}
+                ({previewStats.recoil > gunStats.recoil ? "+" : ""}
+                {Math.floor((previewStats.recoil - gunStats.recoil) * 100) /
+                  100}
+                )
+              </span>
+            )}
+          </span>
+        </div>
+
+        <div className="stat-row">
+          <span className="stat-label">Magazine Size:</span>
+          <span className="stat-value">
+            {Math.floor(gunStats.magazineSize)}
+            {previewStats &&
+              previewStats.magazineSize !== gunStats.magazineSize && (
+                <span
+                  className={
+                    previewStats.magazineSize > gunStats.magazineSize
+                      ? "stat-increase"
+                      : "stat-decrease"
+                  }
+                >
+                  {" "}
+                  (
+                  {previewStats.magazineSize > gunStats.magazineSize ? "+" : ""}
+                  {Math.floor(
+                    (previewStats.magazineSize - gunStats.magazineSize) * 100
+                  ) / 100}
+                  )
+                </span>
+              )}
+          </span>
+        </div>
+      </div>
+    );
+  };
+
+  // Render a part item
+  const renderPartItem = (part: GunPart, index: number) => {
+    return (
+      <div
+        key={part.id}
+        className="part-item"
+        onClick={() => equipPart(part.id)}
+        onMouseEnter={() => setHoveredPart(part.id)}
+        onMouseLeave={() => setHoveredPart(null)}
+      >
+        <div className="part-name">{part.name}</div>
+        <div className="part-category">
+          {part.category.charAt(0).toUpperCase() + part.category.slice(1)} Part
+        </div>
+        <div className="part-description">{part.description}</div>
+        <div className="part-stats">
+          {getStatChanges(part).map(renderStatChange)}
+        </div>
+      </div>
+    );
+  };
+
+  // Only render if modal is open
+  if (!isOpen) return null;
+
   return (
-    <div className="gun-customization">
-      <h1>Gun Customization</h1>
+    <div className="modal-overlay" onClick={onCancel}>
+      <div className="gun-customization" onClick={(e) => e.stopPropagation()}>
+        <div className="screen-header">
+          <h2>Weapon Customization</h2>
+        </div>
 
-      <div className="top-section">
-        {renderGunVisual()}
+        <div className="top-section">
+          <div className="gun-display">{renderGunVisual()}</div>
 
-        <div className="weapon-stats">
-          <h3>Weapon Statistics</h3>
-
-          <div className="stat-bars">
-            {renderStatBar("Damage", gunStats.damage, previewStats?.damage)}
-            {renderStatBar(
-              "Accuracy",
-              gunStats.accuracy,
-              previewStats?.accuracy
-            )}
-            {renderStatBar("Range", gunStats.range, previewStats?.range)}
-            {renderStatBar(
-              "Fire Rate",
-              gunStats.fireRate,
-              previewStats?.fireRate
-            )}
-            {renderStatBar(
-              "Reload Speed",
-              gunStats.reloadSpeed,
-              previewStats?.reloadSpeed
-            )}
-            {renderStatBar(
-              "Recoil Control",
-              gunStats.recoil,
-              previewStats?.recoil
-            )}
-            {renderStatBar(
-              "Magazine Size",
-              gunStats.magazineSize,
-              previewStats?.magazineSize,
-              20
-            )}
+          <div className="weapon-stats">
+            <h3>Weapon Statistics</h3>
+            {renderWeaponStats()}
           </div>
         </div>
-      </div>
 
-      <div className="upgrades-section">
-        <div className="upgrades-header">
+        <div className="upgrade-section">
           <h3>Available Upgrades</h3>
-          <button className="refresh-btn" onClick={regenerateUpgrades}>
-            New Upgrades
+          <div className="upgrade-row">
+            {filteredGunParts.map((part, index) => renderPartItem(part, index))}
+          </div>
+        </div>
+
+        <div className="action-buttons">
+          <button className="cancel-button" onClick={onCancel}>
+            Cancel
+          </button>
+          <button className="save-button" onClick={handleSave}>
+            Save Changes
           </button>
         </div>
-        <div className="upgrade-row">
-          {gunParts
-            .filter(
-              (part) =>
-                !part.id.startsWith("standard-") &&
-                !Object.values(equippedParts).includes(part.id)
-            )
-            .slice(0, 3)
-            .map((part) => (
-              <div
-                key={part.id}
-                className="part-item"
-                onClick={() => equipPart(part.id)}
-                onMouseEnter={() => setHoveredPart(part.id)}
-                onMouseLeave={() => setHoveredPart(null)}
-              >
-                <div className="part-name">{part.name}</div>
-                <div className="part-category">
-                  {part.category.charAt(0).toUpperCase() +
-                    part.category.slice(1)}{" "}
-                  Part
-                </div>
-                <div className="part-description">{part.description}</div>
-                <div className="part-stats">
-                  {getStatChanges(part).map(renderStatChange)}
-                </div>
-              </div>
-            ))}
-        </div>
-      </div>
-
-      <div className="action-buttons">
-        <button className="cancel-btn" onClick={onCancel}>
-          Cancel
-        </button>
-        <button
-          className="save-btn"
-          onClick={() => onSave(getFinalWeaponStats())}
-        >
-          Save Changes
-        </button>
       </div>
     </div>
   );
