@@ -706,7 +706,7 @@ const GunCustomization: React.FC<GunCustomizationProps> = ({
         <>
           <rect
             x="235"
-            y="175"
+            y="80"
             width="55"
             height="15"
             fill="#444"
@@ -715,7 +715,7 @@ const GunCustomization: React.FC<GunCustomizationProps> = ({
           />
           <circle
             cx="280"
-            cy="182.5"
+            cy="87.5"
             r="5"
             fill="#222"
             stroke="#777"
@@ -730,7 +730,7 @@ const GunCustomization: React.FC<GunCustomizationProps> = ({
         <>
           <rect
             x="235"
-            y="175"
+            y="80"
             width="45"
             height="15"
             fill="#444"
@@ -739,7 +739,7 @@ const GunCustomization: React.FC<GunCustomizationProps> = ({
           />
           <rect
             x="245"
-            y="165"
+            y="70"
             width="30"
             height="5"
             fill="#555"
@@ -748,7 +748,7 @@ const GunCustomization: React.FC<GunCustomizationProps> = ({
           />
           <circle
             cx="270"
-            cy="182.5"
+            cy="87.5"
             r="5"
             fill="#222"
             stroke="#777"
@@ -763,7 +763,7 @@ const GunCustomization: React.FC<GunCustomizationProps> = ({
         <>
           <rect
             x="235"
-            y="172"
+            y="77"
             width="45"
             height="21"
             fill="#555"
@@ -772,7 +772,7 @@ const GunCustomization: React.FC<GunCustomizationProps> = ({
           />
           <circle
             cx="270"
-            cy="182.5"
+            cy="87.5"
             r="6"
             fill="#222"
             stroke="#777"
@@ -787,7 +787,7 @@ const GunCustomization: React.FC<GunCustomizationProps> = ({
         <>
           <rect
             x="235"
-            y="176"
+            y="81"
             width="40"
             height="13"
             fill="#444"
@@ -796,7 +796,7 @@ const GunCustomization: React.FC<GunCustomizationProps> = ({
           />
           <circle
             cx="265"
-            cy="182.5"
+            cy="87.5"
             r="4"
             fill="#222"
             stroke="#777"
@@ -811,7 +811,7 @@ const GunCustomization: React.FC<GunCustomizationProps> = ({
         <>
           <rect
             x="235"
-            y="175"
+            y="80"
             width="50"
             height="15"
             fill="#444"
@@ -820,7 +820,7 @@ const GunCustomization: React.FC<GunCustomizationProps> = ({
           />
           <rect
             x="275"
-            y="172"
+            y="77"
             width="15"
             height="21"
             fill="#666"
@@ -829,7 +829,7 @@ const GunCustomization: React.FC<GunCustomizationProps> = ({
           />
           <circle
             cx="282.5"
-            cy="182.5"
+            cy="87.5"
             r="3"
             fill="#222"
             stroke="#777"
@@ -843,7 +843,7 @@ const GunCustomization: React.FC<GunCustomizationProps> = ({
       <>
         <rect
           x="235"
-          y="175"
+          y="80"
           width="40"
           height="15"
           fill="#444"
@@ -852,7 +852,7 @@ const GunCustomization: React.FC<GunCustomizationProps> = ({
         />
         <circle
           cx="265"
-          cy="182.5"
+          cy="87.5"
           r="5"
           fill="#222"
           stroke="#777"
@@ -870,7 +870,7 @@ const GunCustomization: React.FC<GunCustomizationProps> = ({
         <>
           <rect
             x="142"
-            y="205"
+            y="170"
             width="20"
             height="50"
             fill="#444"
@@ -879,7 +879,7 @@ const GunCustomization: React.FC<GunCustomizationProps> = ({
           />
           <rect
             x="140"
-            y="255"
+            y="220"
             width="24"
             height="5"
             fill="#555"
@@ -891,7 +891,7 @@ const GunCustomization: React.FC<GunCustomizationProps> = ({
             <rect
               key={`ammo-window-${i}`}
               x="144"
-              y={210 + i * 10}
+              y={175 + i * 10}
               width="16"
               height="3"
               fill="#222"
@@ -908,7 +908,7 @@ const GunCustomization: React.FC<GunCustomizationProps> = ({
         <>
           <rect
             x="142"
-            y="205"
+            y="170"
             width="25"
             height="55"
             fill="#444"
@@ -917,7 +917,7 @@ const GunCustomization: React.FC<GunCustomizationProps> = ({
           />
           <rect
             x="140"
-            y="260"
+            y="225"
             width="29"
             height="5"
             fill="#555"
@@ -929,7 +929,7 @@ const GunCustomization: React.FC<GunCustomizationProps> = ({
             <rect
               key={`ammo-window-${i}`}
               x="144"
-              y={210 + i * 10}
+              y={175 + i * 10}
               width="20"
               height="3"
               fill="#222"
@@ -946,7 +946,7 @@ const GunCustomization: React.FC<GunCustomizationProps> = ({
         <>
           <rect
             x="142"
-            y="210"
+            y="175"
             width="20"
             height="30"
             fill="#444"
@@ -955,7 +955,7 @@ const GunCustomization: React.FC<GunCustomizationProps> = ({
           />
           <rect
             x="140"
-            y="240"
+            y="205"
             width="24"
             height="3"
             fill="#555"
@@ -967,7 +967,7 @@ const GunCustomization: React.FC<GunCustomizationProps> = ({
             <rect
               key={`ammo-window-${i}`}
               x="144"
-              y={215 + i * 10}
+              y={180 + i * 10}
               width="16"
               height="3"
               fill="#222"
@@ -983,7 +983,7 @@ const GunCustomization: React.FC<GunCustomizationProps> = ({
       <>
         <rect
           x="142"
-          y="205"
+          y="170"
           width="20"
           height="35"
           fill="#444"
@@ -992,7 +992,7 @@ const GunCustomization: React.FC<GunCustomizationProps> = ({
         />
         <rect
           x="140"
-          y="240"
+          y="205"
           width="24"
           height="5"
           fill="#555"
@@ -1004,7 +1004,7 @@ const GunCustomization: React.FC<GunCustomizationProps> = ({
           <rect
             key={`ammo-window-${i}`}
             x="144"
-            y={210 + i * 10}
+            y={175 + i * 10}
             width="16"
             height="3"
             fill="#222"
@@ -1022,7 +1022,7 @@ const GunCustomization: React.FC<GunCustomizationProps> = ({
     if (type.includes("match")) {
       return (
         <path
-          d="M165 210 L172 210 L171 225 L166 225 Z"
+          d="M165 115 L172 115 L171 130 L166 130 Z"
           fill="#666"
           stroke="#777"
           strokeWidth="1.5"
@@ -1033,7 +1033,7 @@ const GunCustomization: React.FC<GunCustomizationProps> = ({
     else if (type.includes("competition")) {
       return (
         <path
-          d="M165 210 L172 210 L172 220 L165 220 Z"
+          d="M165 115 L172 115 L172 125 L165 125 Z"
           fill="#555"
           stroke="#777"
           strokeWidth="1.5"
@@ -1044,7 +1044,7 @@ const GunCustomization: React.FC<GunCustomizationProps> = ({
     else if (type.includes("custom")) {
       return (
         <path
-          d="M165 210 L174 210 L172 227 L167 227 Z"
+          d="M165 115 L174 115 L172 132 L167 132 Z"
           fill="#666"
           stroke="#aaa"
           strokeWidth="1.5"
@@ -1054,7 +1054,7 @@ const GunCustomization: React.FC<GunCustomizationProps> = ({
     // Default standard trigger
     return (
       <path
-        d="M165 210 L172 210 L170 230 L167 230 Z"
+        d="M165 115 L172 115 L170 135 L167 135 Z"
         fill="#444"
         stroke="#777"
         strokeWidth="1.5"
@@ -1068,7 +1068,7 @@ const GunCustomization: React.FC<GunCustomizationProps> = ({
     if (type.includes("match")) {
       return (
         <path
-          d="M120 165 L240 165 L255 175 L255 195 L120 195 Z"
+          d="M120 70 L240 70 L255 80 L255 100 L120 100 Z"
           fill="#444"
           stroke="#777"
           strokeWidth="2"
@@ -1079,7 +1079,7 @@ const GunCustomization: React.FC<GunCustomizationProps> = ({
     else if (type.includes("lightweight")) {
       return (
         <path
-          d="M120 165 L240 165 L250 175 L250 195 L120 195 Z"
+          d="M120 70 L240 70 L250 80 L250 100 L120 100 Z"
           fill="#666"
           stroke="#777"
           strokeWidth="1.5"
@@ -1090,7 +1090,7 @@ const GunCustomization: React.FC<GunCustomizationProps> = ({
     else if (type.includes("competition")) {
       return (
         <path
-          d="M120 165 L240 165 L252 175 L252 195 L120 195 Z"
+          d="M120 70 L240 70 L252 80 L252 100 L120 100 Z"
           fill="#555"
           stroke="#999"
           strokeWidth="2"
@@ -1101,7 +1101,7 @@ const GunCustomization: React.FC<GunCustomizationProps> = ({
     else if (type.includes("reinforced")) {
       return (
         <path
-          d="M120 165 L240 165 L250 175 L250 195 L120 195 Z"
+          d="M120 70 L240 70 L250 80 L250 100 L120 100 Z"
           fill="#333"
           stroke="#666"
           strokeWidth="3"
@@ -1111,7 +1111,7 @@ const GunCustomization: React.FC<GunCustomizationProps> = ({
     // Default standard slide
     return (
       <path
-        d="M120 165 L240 165 L250 175 L250 195 L120 195 Z"
+        d="M120 70 L240 70 L250 80 L250 100 L120 100 Z"
         fill="#444"
         stroke="#777"
         strokeWidth="2"
@@ -1125,7 +1125,7 @@ const GunCustomization: React.FC<GunCustomizationProps> = ({
     if (type.includes("polymer")) {
       return (
         <path
-          d="M 141 185 L 164 185 L 164 230 L 141 230 Z"
+          d="M 141 90 L 164 90 L 164 176 L 141 176 Z"
           fill="#555"
           stroke="#777"
           strokeWidth="1.5"
@@ -1136,7 +1136,7 @@ const GunCustomization: React.FC<GunCustomizationProps> = ({
     else if (type.includes("alloy")) {
       return (
         <path
-          d="M 141 185 L 166 185 L 166 230 L 141 230 Z"
+          d="M 141 90 L 166 90 L 166 176 L 141 176 Z"
           fill="#666"
           stroke="#888"
           strokeWidth="2"
@@ -1147,7 +1147,7 @@ const GunCustomization: React.FC<GunCustomizationProps> = ({
     else if (type.includes("skeletonized")) {
       return (
         <path
-          d="M 141 185 L 164 185 L 164 230 L 141 230 Z"
+          d="M 141 90 L 164 90 L 164 176 L 141 176 Z"
           fill="#444"
           stroke="#777"
           strokeWidth="2"
@@ -1158,7 +1158,7 @@ const GunCustomization: React.FC<GunCustomizationProps> = ({
     // Default standard frame
     return (
       <path
-        d="M 141 185 L 164 185 L 164 230 L 141 230 Z"
+        d="M 141 90 L 164 90 L 164 176 L 141 176 Z"
         fill="#444"
         stroke="#777"
         strokeWidth="2"
@@ -1173,7 +1173,7 @@ const GunCustomization: React.FC<GunCustomizationProps> = ({
       return (
         <rect
           x="160"
-          y="185"
+          y="90"
           width="20"
           height="15"
           fill="#555"
@@ -1187,7 +1187,7 @@ const GunCustomization: React.FC<GunCustomizationProps> = ({
       return (
         <rect
           x="160"
-          y="185"
+          y="90"
           width="20"
           height="15"
           fill="#666"
@@ -1200,7 +1200,7 @@ const GunCustomization: React.FC<GunCustomizationProps> = ({
     return (
       <rect
         x="160"
-        y="185"
+        y="90"
         width="20"
         height="15"
         fill="#444"
@@ -1257,9 +1257,9 @@ const GunCustomization: React.FC<GunCustomizationProps> = ({
               {/* Firing pin */}
               <line
                 x1="160"
-                y1="192"
+                y1="97"
                 x2="180"
-                y2="192"
+                y2="97"
                 stroke="#666"
                 strokeWidth="2"
               />
@@ -1268,9 +1268,9 @@ const GunCustomization: React.FC<GunCustomizationProps> = ({
                 <line
                   key={`spring-${i}`}
                   x1={165 + i * 8}
-                  y1="187"
+                  y1="92"
                   x2={165 + i * 8}
-                  y2="198"
+                  y2="103"
                   stroke="#666"
                   strokeWidth="1"
                   strokeDasharray="1,1"
@@ -1289,18 +1289,18 @@ const GunCustomization: React.FC<GunCustomizationProps> = ({
                 : renderFrameByType("standard")}
               {/* Grip texture/stippling */}
               <path
-                d="M142 205 L162 205 L162 230 L142 230 Z"
+                d="M142 110 L162 110 L162 165 L142 165 Z"
                 fill={equippedParts.frame ? "#3a3a3a" : "#2a2a2a"}
                 stroke="none"
               />
               <g opacity="0.7">
                 {/* Stippling dots pattern */}
-                {Array.from({ length: 6 }).map((_, row) =>
+                {Array.from({ length: 10 }).map((_, row) =>
                   Array.from({ length: 3 }).map((_, col) => (
                     <circle
                       key={`stipple-${row}-${col}`}
                       cx={147 + col * 5}
-                      cy={210 + row * 4}
+                      cy={115 + row * 5}
                       r={1}
                       fill="#555"
                     />
@@ -1335,9 +1335,9 @@ const GunCustomization: React.FC<GunCustomizationProps> = ({
                 <line
                   key={`serration-${i}`}
                   x1={205 + i * 6}
-                  y1="165"
+                  y1="70"
                   x2={205 + i * 6}
-                  y2="195"
+                  y2="100"
                   stroke="#555"
                   strokeWidth="2"
                 />
@@ -1345,7 +1345,7 @@ const GunCustomization: React.FC<GunCustomizationProps> = ({
               {/* Ejection port */}
               <rect
                 x="185"
-                y="170"
+                y="75"
                 width="30"
                 height="15"
                 fill="#222"
@@ -1353,10 +1353,10 @@ const GunCustomization: React.FC<GunCustomizationProps> = ({
                 strokeWidth="1"
               />
               {/* Front sight */}
-              <rect x="230" y="162" width="5" height="3" fill="#666" />
+              <rect x="230" y="67" width="5" height="3" fill="#666" />
               {/* Rear sight */}
-              <rect x="130" y="162" width="10" height="3" fill="#666" />
-              <path d="M132 162 L138 162 L138 165 L132 165 Z" fill="#222" />
+              <rect x="130" y="67" width="10" height="3" fill="#666" />
+              <path d="M132 67 L138 67 L138 70 L132 70 Z" fill="#222" />
             </g>
           </svg>
         </div>
