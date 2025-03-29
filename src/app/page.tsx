@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
+import Image from "next/image";
 import GameCanvas from "../components/GameCanvas";
 import styles from "./page.module.css";
 
@@ -20,6 +21,31 @@ export default function Home() {
             You are stranded on a hostile alien planet. Find the escape pod and
             survive the onslaught of xenomorphs.
           </p>
+
+          <div className={styles.inventoryContainer}>
+            <h2 className={styles.inventoryTitle}>INVENTORY</h2>
+            <div className={styles.inventoryGrid}>
+              <div className={styles.inventorySlot}></div>
+              <div className={styles.glockItem}>
+                <Image
+                  src="/images/glock.svg"
+                  alt="Glock"
+                  width={120}
+                  height={80}
+                  className={styles.glockImage}
+                />
+              </div>
+              <div className={styles.inventorySlot}></div>
+              <div className={styles.inventorySlot}></div>
+              <div className={styles.inventorySlot}></div>
+              <div className={styles.inventorySlot}></div>
+              <div className={styles.inventorySlot}></div>
+              <div className={styles.inventorySlot}></div>
+              <div className={styles.inventorySlot}></div>
+              <div className={styles.inventorySlot}></div>
+              <div className={styles.inventorySlot}></div>
+            </div>
+          </div>
 
           <div className={styles.instructionsContainer}>
             <div className={styles.instructionsColumn}>

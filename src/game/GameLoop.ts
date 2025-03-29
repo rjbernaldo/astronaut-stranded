@@ -153,11 +153,11 @@ export class GameLoop {
       this.player.takeDamage(10 * deltaTime); // Damage over time
     }
 
-    // Check if player reached the exit
-    if (this.map.isTileExit(this.player.position.x, this.player.position.y)) {
-      this.gameState.isGameOver = true;
-      return;
-    }
+    // // Check if player reached the exit
+    // if (this.map.isTileExit(this.player.position.x, this.player.position.y)) {
+    //   this.gameState.isGameOver = true;
+    //   return;
+    // }
 
     // Update projectiles
     this.updateProjectiles(deltaTime);
@@ -342,7 +342,9 @@ export class GameLoop {
 
   private spawnEnemies(timestamp: number): void {
     // Check if it's time to spawn a new wave
-    if (timestamp - this.lastEnemySpawnTime < this.enemySpawnInterval) return;
+    if (this.gameState.waveNumber > 1) {
+      if (timestamp - this.lastEnemySpawnTime < this.enemySpawnInterval) return;
+    }
 
     this.lastEnemySpawnTime = timestamp;
 
@@ -360,8 +362,8 @@ export class GameLoop {
     );
 
     // Calculate the view range (slightly larger than canvas)
-    const viewRangeX = this.canvas.width * 0.7;
-    const viewRangeY = this.canvas.height * 0.7;
+    const viewRangeX = this.canvas.width * 0.5;
+    const viewRangeY = this.canvas.height * 0.5;
 
     for (let i = 0; i < this.enemySpawnCount; i++) {
       // Generate a position outside of the player's view
@@ -752,43 +754,6 @@ export class GameLoop {
 
         this.ctx.fillRect(screenX, screenY, tileSize, tileSize);
       }
-    }
-
-    // Draw exit position
-    const exitX =
-      mapCenterX + (this.map.exitPosition.x - this.player.position.x) * scale;
-    const exitY =
-      mapCenterY + (this.map.exitPosition.y - this.player.position.y) * scale;
-
-    // Only draw if exit is visible on minimap
-    if (exitX >= x && exitX <= x + width && exitY >= y && exitY <= y + height) {
-      this.ctx.fillStyle = "#4444FF";
-      this.ctx.beginPath();
-      this.ctx.arc(exitX, exitY, 4, 0, Math.PI * 2);
-      this.ctx.fill();
-    } else {
-      // Draw arrow toward exit if off-screen
-      const angleToExit = Math.atan2(
-        this.map.exitPosition.y - this.player.position.y,
-        this.map.exitPosition.x - this.player.position.x
-      );
-
-      // Draw arrow on the minimap edge
-      const arrowX = mapCenterX + Math.cos(angleToExit) * (width * 0.4);
-      const arrowY = mapCenterY + Math.sin(angleToExit) * (height * 0.4);
-
-      this.ctx.fillStyle = "#4444FF";
-      this.ctx.beginPath();
-      this.ctx.arc(arrowX, arrowY, 3, 0, Math.PI * 2);
-      this.ctx.fill();
-
-      // Draw line pointing toward exit
-      this.ctx.strokeStyle = "rgba(68, 68, 255, 0.5)";
-      this.ctx.lineWidth = 1;
-      this.ctx.beginPath();
-      this.ctx.moveTo(mapCenterX, mapCenterY);
-      this.ctx.lineTo(arrowX, arrowY);
-      this.ctx.stroke();
     }
 
     // Draw enemies on minimap
