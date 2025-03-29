@@ -1,126 +1,126 @@
 "use client";
 
-import React, { useState } from "react";
-import Image from "next/image";
+import { useState } from "react";
 import GameCanvas from "../components/GameCanvas";
-import styles from "./page.module.css";
+import { WeaponStats } from "../types";
+import GunCustomization from "../components/GunCustomization";
+import "./gun-customization.css";
 
 export default function Home() {
   const [gameStarted, setGameStarted] = useState(false);
+  const [showGunCustomization, setShowGunCustomization] = useState(false);
+  const [playerCredits, setPlayerCredits] = useState(100);
+  const [weaponStats, setWeaponStats] = useState<WeaponStats | null>(null);
 
-  const startGame = () => {
+  const handleStartGame = () => {
     setGameStarted(true);
   };
 
+  const handleCustomizeWeapon = () => {
+    setShowGunCustomization(true);
+  };
+
+  const handleSaveCustomization = (stats: WeaponStats) => {
+    setWeaponStats(stats);
+    setShowGunCustomization(false);
+  };
+
+  const handleCancelCustomization = () => {
+    setShowGunCustomization(false);
+  };
+
+  if (showGunCustomization) {
+    return (
+      <GunCustomization
+        initialWeaponStats={weaponStats}
+        playerCredits={playerCredits}
+        onSave={handleSaveCustomization}
+        onCancel={handleCancelCustomization}
+      />
+    );
+  }
+
+  if (gameStarted) {
+    return <GameCanvas initialWeaponStats={weaponStats} />;
+  }
+
   return (
-    <main className={styles.main}>
-      {!gameStarted ? (
-        <div className={styles.startScreen}>
-          <h1 className={styles.title}>ASTRONAUT: STRANDED</h1>
-          <p className={styles.description}>
-            You are stranded on a hostile alien planet. Find the escape pod and
-            survive the onslaught of xenomorphs.
+    <main className="flex min-h-screen flex-col items-center justify-center p-8 bg-black text-white font-mono">
+      <div className="max-w-3xl w-full bg-gray-900 p-8 rounded-lg border border-gray-800">
+        <h1 className="text-4xl font-bold mb-6 text-center">
+          ASTRONAUT: STRANDED
+        </h1>
+
+        <div className="mb-6">
+          <h2 className="text-2xl mb-3 text-green-400">Mission Briefing:</h2>
+          <p className="mb-4">
+            You are an astronaut stranded on a hostile alien planet. Your ship
+            has crashed, and the environment is filled with alien creatures
+            hunting for you. Use your combat training and available resources to
+            survive as long as possible.
           </p>
-
-          <div className={styles.inventoryContainer}>
-            <h2 className={styles.inventoryTitle}>INVENTORY</h2>
-            <div className={styles.inventoryGrid}>
-              <div className={styles.inventorySlot}></div>
-              <div className={`${styles.gunPartSlot} ${styles.gunSlideSlot}`}>
-                <Image
-                  src="/images/gun-slide.svg"
-                  alt="Gun Slide"
-                  width={60}
-                  height={40}
-                  className={styles.gunPartImage}
-                />
-              </div>
-              <div className={`${styles.gunPartSlot} ${styles.gunBarrelSlot}`}>
-                <Image
-                  src="/images/gun-barrel.svg"
-                  alt="Gun Barrel"
-                  width={40}
-                  height={40}
-                  className={styles.gunPartImage}
-                />
-              </div>
-              <div className={styles.inventorySlot}></div>
-              <div className={styles.inventorySlot}></div>
-              <div className={`${styles.gunPartSlot} ${styles.gunFrameSlot}`}>
-                <Image
-                  src="/images/gun-frame.svg"
-                  alt="Gun Frame"
-                  width={40}
-                  height={40}
-                  className={styles.gunPartImage}
-                />
-              </div>
-              <div className={styles.inventorySlot}></div>
-              <div className={styles.inventorySlot}></div>
-              <div className={styles.inventorySlot}></div>
-              <div className={`${styles.gunPartSlot} ${styles.gunGripSlot}`}>
-                <Image
-                  src="/images/gun-grip.svg"
-                  alt="Gun Grip"
-                  width={40}
-                  height={40}
-                  className={styles.gunPartImage}
-                />
-              </div>
-              <div className={styles.inventorySlot}></div>
-              <div className={styles.inventorySlot}></div>
-              <div className={styles.inventorySlot}></div>
-              <div className={styles.inventorySlot}></div>
-              <div className={styles.inventorySlot}></div>
-            </div>
-          </div>
-
-          <div className={styles.instructionsContainer}>
-            <div className={styles.instructionsColumn}>
-              <h2>Controls:</h2>
-              <ul>
-                <li>WASD: Movement</li>
-                <li>Mouse: Aim</li>
-                <li>Left Click: Shoot</li>
-                <li>R: Reload Weapon</li>
-                <li>Space: Toggle Flashlight</li>
-                <li>1-3: Switch Weapons</li>
-              </ul>
-            </div>
-
-            <div className={styles.instructionsColumn}>
-              <h2>Weapons:</h2>
-              <ul>
-                <li>Pistol (1): Reliable sidearm</li>
-                <li>Rifle (2): Automatic, high rate of fire</li>
-                <li>Shotgun (3): Powerful at close range</li>
-              </ul>
-            </div>
-
-            <div className={styles.instructionsColumn}>
-              <h2>Enemies:</h2>
-              <ul>
-                <li>Scout: Fast but weak</li>
-                <li>Brute: Slow but powerful</li>
-                <li>Spitter: Ranged acid attacks</li>
-              </ul>
-            </div>
-          </div>
-
-          <button className={styles.startButton} onClick={startGame}>
-            START MISSION
-          </button>
-
-          <div className={styles.footer}>
-            <p>
-              Inspired by the film <em>Alien</em> (1979)
-            </p>
-            <p>A Vampire Survivors-like roguelike survival game</p>
-          </div>
+          <p className="mb-4">
+            Search for resources, upgrade your weapons, and eliminate the alien
+            threat. Good luck, astronaut. You'll need it.
+          </p>
         </div>
-      ) : (
-        <GameCanvas />
-      )}
+
+        <div className="mb-6">
+          <h2 className="text-2xl mb-3 text-green-400">Controls:</h2>
+          <ul className="list-disc pl-6 space-y-2">
+            <li>
+              Move with <span className="bg-gray-800 px-2 rounded">W</span>{" "}
+              <span className="bg-gray-800 px-2 rounded">A</span>{" "}
+              <span className="bg-gray-800 px-2 rounded">S</span>{" "}
+              <span className="bg-gray-800 px-2 rounded">D</span>
+            </li>
+            <li>Aim with mouse</li>
+            <li>Shoot with left mouse button</li>
+            <li>
+              Reload with <span className="bg-gray-800 px-2 rounded">R</span>
+            </li>
+            <li>
+              Switch weapons with{" "}
+              <span className="bg-gray-800 px-2 rounded">1</span>{" "}
+              <span className="bg-gray-800 px-2 rounded">2</span>{" "}
+              <span className="bg-gray-800 px-2 rounded">3</span>
+            </li>
+          </ul>
+        </div>
+
+        {weaponStats && (
+          <div className="mb-6">
+            <h2 className="text-2xl mb-3 text-green-400">Equipped Weapon:</h2>
+            <div className="bg-gray-800 p-4 rounded">
+              <h3 className="text-xl mb-2">{weaponStats.name.toUpperCase()}</h3>
+              <div className="grid grid-cols-2 gap-2">
+                <div>Damage: {weaponStats.damage}</div>
+                <div>Fire Rate: {weaponStats.fireRate}s</div>
+                <div>Ammo: {weaponStats.magazineSize}</div>
+                <div>Reload: {weaponStats.reloadTime}s</div>
+              </div>
+              {weaponStats.customized && (
+                <div className="mt-2 text-green-400">CUSTOMIZED</div>
+              )}
+            </div>
+          </div>
+        )}
+
+        <div className="flex flex-col sm:flex-row gap-4 justify-center">
+          <button
+            onClick={handleCustomizeWeapon}
+            className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-md transition-colors"
+          >
+            Customize Weapon
+          </button>
+          <button
+            onClick={handleStartGame}
+            className="px-6 py-3 bg-green-600 hover:bg-green-700 text-white rounded-md transition-colors"
+          >
+            Start Mission
+          </button>
+        </div>
+      </div>
     </main>
   );
 }

@@ -1,36 +1,35 @@
 import React, { useRef, useEffect } from "react";
 import { GameLoop } from "../game/GameLoop";
+import { WeaponStats } from "../types";
 
 interface GameCanvasProps {
   width?: number;
   height?: number;
+  initialWeaponStats?: WeaponStats | null;
 }
 
 const GameCanvas: React.FC<GameCanvasProps> = ({
   width = 800,
   height = 600,
+  initialWeaponStats,
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
-    if (!canvasRef.current) return;
+    const canvas = canvasRef.current;
+    if (!canvas) return;
 
-    // Create game instance
-    const game = new GameLoop(canvasRef.current);
+    canvas.width = width;
+    canvas.height = height;
 
-    // Start game loop
-    game.start();
+    const seed = Math.random().toString();
+    const gameLoop = new GameLoop(canvas, seed, initialWeaponStats);
+    gameLoop.start();
 
-    // Clean up event listeners on unmount
     return () => {
-      // Remove event listeners if needed
-      window.removeEventListener("keydown", () => {});
-      window.removeEventListener("keyup", () => {});
-      canvasRef.current?.removeEventListener("mousemove", () => {});
-      canvasRef.current?.removeEventListener("mousedown", () => {});
-      canvasRef.current?.removeEventListener("mouseup", () => {});
+      gameLoop.stop();
     };
-  }, []);
+  }, [width, height, initialWeaponStats]);
 
   return (
     <canvas

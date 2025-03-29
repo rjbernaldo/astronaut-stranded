@@ -14,7 +14,10 @@ export class Astronaut {
   reloading: boolean;
   lastFireTime: number;
 
-  constructor(startPosition: Position) {
+  constructor(
+    startPosition: Position,
+    initialWeaponStats?: WeaponStats | null
+  ) {
     this.position = startPosition;
     this.health = 100;
     this.ammo = new Map();
@@ -27,45 +30,51 @@ export class Astronaut {
     this.reloading = false;
     this.lastFireTime = 0;
 
-    // Initialize default weapons
-    this.addWeapon("pistol", {
-      name: "pistol",
-      damage: 10,
-      magazineSize: 7,
-      reserveAmmo: 21,
-      fireRate: 0.5,
-      reloadTime: 2,
-      recoil: 5,
-      projectileCount: 1,
-      spread: 0,
-    });
+    // Initialize default weapons if no custom weapon provided
+    if (!initialWeaponStats) {
+      this.addWeapon("pistol", {
+        name: "pistol",
+        damage: 10,
+        magazineSize: 7,
+        reserveAmmo: 21,
+        fireRate: 0.5,
+        reloadTime: 2,
+        recoil: 5,
+        projectileCount: 1,
+        spread: 0,
+      });
 
-    this.addWeapon("rifle", {
-      name: "rifle",
-      damage: 15,
-      magazineSize: 30,
-      reserveAmmo: 90,
-      fireRate: 0.1,
-      reloadTime: 3,
-      recoil: 3,
-      projectileCount: 1,
-      spread: 3,
-    });
+      this.addWeapon("rifle", {
+        name: "rifle",
+        damage: 15,
+        magazineSize: 30,
+        reserveAmmo: 90,
+        fireRate: 0.1,
+        reloadTime: 3,
+        recoil: 3,
+        projectileCount: 1,
+        spread: 3,
+      });
 
-    this.addWeapon("shotgun", {
-      name: "shotgun",
-      damage: 8,
-      magazineSize: 6,
-      reserveAmmo: 18,
-      fireRate: 1,
-      reloadTime: 0.8,
-      recoil: 10,
-      projectileCount: 5,
-      spread: 15,
-    });
+      this.addWeapon("shotgun", {
+        name: "shotgun",
+        damage: 8,
+        magazineSize: 6,
+        reserveAmmo: 18,
+        fireRate: 1,
+        reloadTime: 0.8,
+        recoil: 10,
+        projectileCount: 5,
+        spread: 15,
+      });
 
-    // Set pistol as active weapon
-    this.switchWeapon("pistol");
+      // Set pistol as active weapon
+      this.switchWeapon("pistol");
+    } else {
+      // Initialize with custom weapon
+      this.addWeapon(initialWeaponStats.name, initialWeaponStats);
+      this.switchWeapon(initialWeaponStats.name);
+    }
   }
 
   addWeapon(name: string, stats: WeaponStats): void {

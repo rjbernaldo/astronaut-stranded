@@ -2,7 +2,13 @@ import { Astronaut } from "./Astronaut";
 import { Enemy } from "./Enemy";
 import { GameMap } from "./Map";
 import { Projectile } from "./Projectile";
-import { Position, EnemyStats, EnemyType, GameState } from "../types";
+import {
+  Position,
+  EnemyStats,
+  EnemyType,
+  GameState,
+  WeaponStats,
+} from "../types";
 import seedrandom from "seedrandom";
 
 // Constants for difficulty scaling
@@ -37,19 +43,25 @@ export class GameLoop {
     nextLevelTime: DIFFICULTY_INCREASE_TIME,
   };
 
-  constructor(canvas: HTMLCanvasElement) {
+  private animationFrameId: number | null = null;
+
+  constructor(
+    canvas: HTMLCanvasElement,
+    seed?: string,
+    initialWeaponStats?: WeaponStats | null
+  ) {
     this.canvas = canvas;
     this.ctx = canvas.getContext("2d")!;
 
     // Create map with random seed
-    const seed = Math.random().toString();
+    seed = seed || Math.random().toString();
     this.rng = seedrandom(seed);
     this.map = new GameMap(seed);
 
     // Create player in the center of the map
     const startX = Math.floor(this.map.width / 2) * this.map.tileSize;
     const startY = Math.floor(this.map.height / 2) * this.map.tileSize;
-    this.player = new Astronaut({ x: startX, y: startY });
+    this.player = new Astronaut({ x: startX, y: startY }, initialWeaponStats);
 
     // Set camera to player position
     this.cameraPosition = { ...this.player.position };
@@ -116,7 +128,22 @@ export class GameLoop {
     this.handleResize();
 
     // Start game loop
-    requestAnimationFrame(this.loop.bind(this));
+    this.animationFrameId = requestAnimationFrame(this.loop.bind(this));
+  }
+
+  stop(): void {
+    if (this.animationFrameId) {
+      cancelAnimationFrame(this.animationFrameId);
+      this.animationFrameId = null;
+    }
+
+    // Clean up event listeners
+    window.removeEventListener("keydown", () => {});
+    window.removeEventListener("keyup", () => {});
+    this.canvas.removeEventListener("mousemove", () => {});
+    this.canvas.removeEventListener("mousedown", () => {});
+    this.canvas.removeEventListener("mouseup", () => {});
+    window.removeEventListener("resize", () => {});
   }
 
   private loop(timestamp: number): void {
@@ -132,7 +159,7 @@ export class GameLoop {
 
     // Continue loop
     if (!this.gameState.isGameOver) {
-      requestAnimationFrame(this.loop.bind(this));
+      this.animationFrameId = requestAnimationFrame(this.loop.bind(this));
     }
   }
 
@@ -367,8 +394,8 @@ export class GameLoop {
 
     for (let i = 0; i < this.enemySpawnCount; i++) {
       // Generate a position outside of the player's view
-      let spawnX: number;
-      let spawnY: number;
+      let spawnX: number = 0;
+      let spawnY: number = 0;
       let isOutsideView = false;
 
       // Keep trying until we get a position outside of view range

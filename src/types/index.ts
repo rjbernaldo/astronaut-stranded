@@ -23,11 +23,22 @@ export interface WeaponStats {
   damage: number;
   magazineSize: number;
   reserveAmmo: number;
-  fireRate: number; // in seconds
-  reloadTime: number; // in seconds
-  recoil: number; // in degrees
-  projectileCount: number; // 1 for single shot, more for shotgun
-  spread: number; // in degrees
+  fireRate: number; // Seconds between shots
+  reloadTime: number; // Seconds to reload
+  recoil: number; // Amount of recoil
+  projectileCount: number; // Number of projectiles per shot (e.g. shotgun)
+  spread: number; // Spread angle in degrees
+  // New fields for customization
+  customized?: boolean;
+  range?: number; // Affects projectile distance
+  parts?: {
+    barrel: string;
+    slide: string;
+    frame: string;
+    trigger: string;
+    magazine: string;
+    internal: string;
+  };
 }
 
 export type EnemyType = "Scout" | "Brute" | "Spitter";
