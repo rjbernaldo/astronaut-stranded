@@ -118,6 +118,9 @@
   transition: all 0.3s ease;
   border: 1px solid #555;
   position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
 }
 
 .part-item:hover {
@@ -150,9 +153,19 @@
   color: #fff;
 }
 
+.part-description {
+  font-size: 12px;
+  color: #aaa;
+  margin-bottom: 5px;
+  line-height: 1.2;
+}
+
 .part-stats {
   font-size: 12px;
   color: #ccc;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
 }
 
 .stat {
@@ -170,9 +183,17 @@
 }
 
 .part-price {
-  margin-top: 8px;
+  margin-top: 5px;
   font-weight: bold;
   color: #ffcc00;
+  font-size: 13px;
+}
+
+.part-status {
+  font-size: 11px;
+  color: #aaa;
+  margin-top: 2px;
+  font-style: italic;
 }
 
 .stats-panel {

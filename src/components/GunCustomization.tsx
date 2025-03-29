@@ -37,194 +37,326 @@ interface GunPart {
   description: string;
   unlocked: boolean;
   cost: number;
+  price: number;
 }
 
-// Define sample gun parts data
-const gunParts: GunPart[] = [
-  // Barrels
-  {
-    id: "standard-barrel",
-    name: "Standard Barrel",
-    category: "barrel",
-    image: "/gun-parts/barrel-standard.png",
-    stats: [
-      { name: "damage", value: 0 },
-      { name: "range", value: 0 },
-    ],
-    description: "Standard-issue barrel with balanced performance.",
-    unlocked: true,
-    cost: 0,
-  },
-  {
-    id: "long-barrel",
-    name: "Long Barrel",
-    category: "barrel",
-    image: "/gun-parts/barrel-long.png",
-    stats: [
-      { name: "damage", value: 5 },
-      { name: "range", value: 20 },
-      { name: "recoil", value: 2 },
-    ],
-    description: "Extended barrel for increased damage and range.",
-    unlocked: true,
-    cost: 50,
-  },
-  {
-    id: "suppressor",
-    name: "Suppressor",
-    category: "barrel",
-    image: "/gun-parts/barrel-suppressor.png",
-    stats: [
-      { name: "damage", value: -3 },
-      { name: "spread", value: -5 },
-    ],
-    description: "Reduces sound signature and improves accuracy.",
-    unlocked: false,
-    cost: 75,
-  },
-  // Magazines
-  {
-    id: "standard-magazine",
-    name: "Standard Magazine",
-    category: "magazine",
-    image: "/gun-parts/magazine-standard.png",
-    stats: [{ name: "magazineSize", value: 0 }],
-    description: "Standard-issue magazine with 7 rounds.",
-    unlocked: true,
-    cost: 0,
-  },
-  {
-    id: "extended-magazine",
-    name: "Extended Magazine",
-    category: "magazine",
-    image: "/gun-parts/magazine-extended.png",
-    stats: [
-      { name: "magazineSize", value: 5 },
-      { name: "reloadTime", value: 0.2 },
-    ],
-    description: "Larger magazine capacity but slower to reload.",
-    unlocked: true,
-    cost: 40,
-  },
-  {
-    id: "quick-release",
-    name: "Quick-Release Magazine",
-    category: "magazine",
-    image: "/gun-parts/magazine-quick.png",
-    stats: [
-      { name: "magazineSize", value: -2 },
-      { name: "reloadTime", value: -0.5 },
-    ],
-    description: "Faster reload time but reduced capacity.",
-    unlocked: false,
-    cost: 60,
-  },
-  // Triggers
-  {
-    id: "standard-trigger",
-    name: "Standard Trigger",
-    category: "trigger",
-    image: "/gun-parts/trigger-standard.png",
-    stats: [{ name: "fireRate", value: 0 }],
-    description: "Standard-issue trigger with balanced performance.",
-    unlocked: true,
-    cost: 0,
-  },
-  {
-    id: "match-trigger",
-    name: "Match Trigger",
-    category: "trigger",
-    image: "/gun-parts/trigger-match.png",
-    stats: [
-      { name: "fireRate", value: -0.1 },
-      { name: "spread", value: 2 },
-    ],
-    description: "Competition-grade trigger for faster firing.",
-    unlocked: false,
-    cost: 80,
-  },
+// Define part name prefixes and suffixes for random generation
+const partNamePrefixes: Record<PartCategory, string[]> = {
+  barrel: [
+    "Standard",
+    "Extended",
+    "Tactical",
+    "Heavy",
+    "Lightweight",
+    "Precision",
+    "Compensated",
+    "Ported",
+  ],
+  slide: [
+    "Standard",
+    "Match",
+    "Competition",
+    "Lightweight",
+    "Reinforced",
+    "Milled",
+    "Precision",
+    "Custom",
+  ],
+  frame: [
+    "Standard",
+    "Polymer",
+    "Alloy",
+    "Skeletonized",
+    "Tungsten",
+    "Tactical",
+    "Competition",
+    "Military",
+  ],
+  trigger: [
+    "Standard",
+    "Match",
+    "Competition",
+    "Adjustable",
+    "Tactical",
+    "Two-Stage",
+    "Custom",
+    "Performance",
+  ],
+  magazine: [
+    "Standard",
+    "Extended",
+    "High-Capacity",
+    "Tactical",
+    "Compact",
+    "Combat",
+    "Competition",
+    "Quick-Release",
+  ],
+  internal: [
+    "Standard",
+    "Match-Grade",
+    "Competition",
+    "Precision",
+    "Enhanced",
+    "Tuned",
+    "Custom",
+    "Performance",
+  ],
+};
 
-  // Frame options
-  {
-    id: "standard-frame",
-    name: "Standard Frame",
-    category: "frame",
-    image: "/gun-parts/frame-standard.png",
-    stats: [{ name: "recoil", value: 0 }],
-    description: "Standard-issue frame with balanced weight.",
-    unlocked: true,
-    cost: 0,
-  },
-  {
-    id: "polymer-frame",
-    name: "Polymer Frame",
-    category: "frame",
-    image: "/gun-parts/frame-polymer.png",
-    stats: [
-      { name: "recoil", value: 2 },
-      { name: "fireRate", value: -0.05 },
-    ],
-    description: "Lightweight frame for faster handling.",
-    unlocked: false,
-    cost: 70,
-  },
+const partNameSuffixes: Record<PartCategory, string[]> = {
+  barrel: [
+    "Barrel",
+    "Shroud",
+    "System",
+    "Assembly",
+    "Mod",
+    "Extension",
+    "Component",
+    "Unit",
+  ],
+  slide: [
+    "Slide",
+    "Assembly",
+    "System",
+    "Unit",
+    "Component",
+    "Housing",
+    "Block",
+    "Mechanism",
+  ],
+  frame: [
+    "Frame",
+    "Grip",
+    "Housing",
+    "System",
+    "Assembly",
+    "Chassis",
+    "Platform",
+    "Structure",
+  ],
+  trigger: [
+    "Trigger",
+    "Assembly",
+    "System",
+    "Group",
+    "Mechanism",
+    "Unit",
+    "Setup",
+    "Control",
+  ],
+  magazine: [
+    "Magazine",
+    "Mag",
+    "Clip",
+    "Feeder",
+    "System",
+    "Assembly",
+    "Unit",
+    "Module",
+  ],
+  internal: [
+    "Components",
+    "Assembly",
+    "System",
+    "Mechanism",
+    "Internals",
+    "Package",
+    "Setup",
+    "Kit",
+  ],
+};
 
-  // Slide options
-  {
-    id: "standard-slide",
-    name: "Standard Slide",
-    category: "slide",
-    image: "/gun-parts/slide-standard.png",
-    stats: [
-      { name: "recoil", value: 0 },
-      { name: "spread", value: 0 },
-    ],
-    description: "Standard-issue slide with balanced performance.",
-    unlocked: true,
-    cost: 0,
-  },
-  {
-    id: "lightweight-slide",
-    name: "Lightweight Slide",
-    category: "slide",
-    image: "/gun-parts/slide-lightweight.png",
-    stats: [
-      { name: "recoil", value: -2 },
-      { name: "spread", value: 2 },
-    ],
-    description: "Reduced weight for faster cycling but less accuracy.",
-    unlocked: false,
-    cost: 65,
-  },
+// Define some interesting part descriptions
+const partDescriptions: Record<PartCategory, string[]> = {
+  barrel: [
+    "A balanced barrel offering standard performance.",
+    "Enhanced barrel with improved accuracy and range.",
+    "Tactical barrel designed for rapid follow-up shots.",
+    "Heavy barrel that increases damage but adds weight.",
+    "Lightweight design for faster handling and target acquisition.",
+    "Precision-engineered for exceptional accuracy.",
+    "Features ports that reduce muzzle climb during rapid fire.",
+    "Militaty-spec barrel with exceptional durability.",
+  ],
+  slide: [
+    "Standard slide with balanced performance.",
+    "Competition slide offering improved cycling.",
+    "Lightweight design for faster cycling and reduced recoil.",
+    "Reinforced slide for enhanced durability.",
+    "Precision-machined for consistent performance.",
+    "Custom slide with enhanced grip serrations.",
+    "Features lightening cuts for reduced mass.",
+    "Tactical design with enhanced sights.",
+  ],
+  frame: [
+    "Standard frame with balanced weight and durability.",
+    "Lightweight polymer frame for improved handling.",
+    "Heavy-duty metal alloy frame for reduced recoil.",
+    "Skeletonized frame reduces weight without sacrificing stability.",
+    "Enhanced with tungsten inserts for improved balance.",
+    "Tactical design with improved ergonomics.",
+    "Competition frame with optimized grip angle.",
+    "Military-spec frame with enhanced durability.",
+  ],
+  trigger: [
+    "Standard trigger offering balanced performance.",
+    "Match-grade trigger with crisp break.",
+    "Competition trigger with reduced pull weight.",
+    "Fully adjustable trigger for customized feel.",
+    "Tactical trigger designed for consistent pull.",
+    "Precision two-stage trigger for enhanced control.",
+    "Custom-tuned for optimal performance.",
+    "Performance trigger with minimal travel.",
+  ],
+  magazine: [
+    "Standard capacity magazine with reliable feeding.",
+    "Extended magazine offering increased capacity.",
+    "High-capacity design for prolonged engagements.",
+    "Tactical magazine with improved feeding reliability.",
+    "Compact design without sacrificing capacity.",
+    "Combat-ready magazine with enhanced durability.",
+    "Competition magazine for rapid reloads.",
+    "Features quick-release design for faster reloads.",
+  ],
+  internal: [
+    "Standard internal components with balanced performance.",
+    "Match-grade components for enhanced reliability.",
+    "Competition internals for improved cycling.",
+    "Precision-machined for exceptional accuracy.",
+    "Enhanced with polished contact surfaces.",
+    "Tuned for optimal performance and reliability.",
+    "Custom package with premium components.",
+    "Performance kit with matched and balanced parts.",
+  ],
+};
 
-  // Internal options
-  {
-    id: "standard-internal",
-    name: "Standard Components",
-    category: "internal",
-    image: "/gun-parts/internal-standard.png",
-    stats: [
-      { name: "damage", value: 0 },
-      { name: "spread", value: 0 },
-    ],
-    description: "Standard-issue internal components.",
-    unlocked: true,
-    cost: 0,
-  },
-  {
-    id: "match-internal",
-    name: "Match-Grade Components",
-    category: "internal",
-    image: "/gun-parts/internal-match.png",
-    stats: [
-      { name: "damage", value: 3 },
-      { name: "spread", value: -5 },
-    ],
-    description: "Precision-machined parts for improved performance.",
-    unlocked: false,
-    cost: 90,
-  },
-];
+// Function to randomly generate parts
+const generateRandomParts = (): GunPart[] => {
+  const randomParts: GunPart[] = [];
+
+  // Generate standard parts (always available and free)
+  const categories: PartCategory[] = [
+    "barrel",
+    "slide",
+    "frame",
+    "trigger",
+    "magazine",
+    "internal",
+  ];
+
+  categories.forEach((category) => {
+    // Add standard part (always unlocked and free)
+    randomParts.push({
+      id: `standard-${category}`,
+      name: `Standard ${category.charAt(0).toUpperCase() + category.slice(1)}`,
+      category,
+      image: "/gun-parts/internal-standard.png",
+      stats: [
+        // Standard parts have no stat bonuses
+        { name: category === "barrel" ? "damage" : "recoil", value: 0 },
+      ],
+      description: partDescriptions[category][0],
+      unlocked: true,
+      cost: 0,
+      price: 0,
+    });
+
+    // Generate 2-4 random parts per category
+    const numRandomParts = Math.floor(Math.random() * 3) + 2; // 2-4 parts
+
+    for (let i = 0; i < numRandomParts; i++) {
+      const prefixIndex = Math.floor(
+        Math.random() * partNamePrefixes[category].length
+      );
+      const suffixIndex = Math.floor(
+        Math.random() * partNameSuffixes[category].length
+      );
+
+      // Skip if we generate "Standard [Category]" again
+      if (partNamePrefixes[category][prefixIndex] === "Standard") {
+        continue;
+      }
+
+      const prefix = partNamePrefixes[category][prefixIndex];
+      const suffix = partNameSuffixes[category][suffixIndex];
+      const descIndex = Math.min(
+        prefixIndex,
+        partDescriptions[category].length - 1
+      );
+
+      const unlocked = Math.random() > 0.4; // 60% chance to be unlocked
+      const cost = Math.floor(Math.random() * 80) + 20; // 20-100 cost
+
+      // Generate 1-3 random stats for this part
+      const numStats = Math.floor(Math.random() * 3) + 1;
+      const stats: PartStat[] = [];
+
+      // Define possible stats per category
+      const possibleStats: Record<PartCategory, StatName[]> = {
+        barrel: ["damage", "range", "recoil", "spread"],
+        slide: ["fireRate", "recoil", "spread"],
+        frame: ["recoil", "fireRate", "damage"],
+        trigger: ["fireRate", "spread", "reloadTime"],
+        magazine: ["magazineSize", "reloadTime"],
+        internal: ["damage", "spread", "fireRate", "recoil"],
+      };
+
+      // Choose random stats from possible stats for this category
+      const categoryStats = [...possibleStats[category]];
+      for (let j = 0; j < numStats && categoryStats.length > 0; j++) {
+        const statIndex = Math.floor(Math.random() * categoryStats.length);
+        const statName = categoryStats[statIndex];
+
+        // Remove this stat so we don't pick it again
+        categoryStats.splice(statIndex, 1);
+
+        // Random value between -5 and 10, weighted more toward positive
+        let value = Math.floor(Math.random() * 16) - 5;
+
+        // Adjust value ranges based on stat type
+        if (statName === "magazineSize") {
+          value = Math.max(1, Math.floor(value / 2)); // -2 to +5
+        } else if (statName === "reloadTime") {
+          value = Math.max(-0.5, Math.min(0.5, value / 10)); // -0.5 to +0.5 seconds
+        } else if (statName === "fireRate") {
+          value = Math.max(-0.15, Math.min(0.15, value / 100)); // -0.15 to +0.15 seconds
+        } else if (statName === "spread") {
+          value = value / 2; // -2.5 to +5
+        } else if (statName === "damage") {
+          value = value / 2; // -2.5 to +5
+        }
+
+        stats.push({ name: statName, value });
+      }
+
+      // More expensive parts should have better stats overall
+      let totalValue = stats.reduce((sum, stat) => {
+        // Convert to comparable values
+        if (stat.name === "fireRate") return sum + stat.value * -100; // Negative is better
+        if (stat.name === "reloadTime") return sum + stat.value * -10; // Negative is better
+        return sum + stat.value;
+      }, 0);
+
+      // Adjust cost based on stats value
+      const adjustedCost = Math.max(20, Math.min(200, cost + totalValue * 5));
+
+      randomParts.push({
+        id: `${prefix.toLowerCase()}-${category}`,
+        name: `${prefix} ${suffix}`,
+        category,
+        image: "/gun-parts/internal-standard.png",
+        stats,
+        description: partDescriptions[category][descIndex],
+        unlocked,
+        cost: unlocked ? adjustedCost : adjustedCost * 1.5,
+        price: unlocked ? adjustedCost : adjustedCost * 1.5,
+      });
+    }
+  });
+
+  return randomParts;
+};
 
 // Default equipped parts (one of each category)
 const defaultEquippedParts = {
@@ -251,17 +383,24 @@ const GunCustomization: React.FC<GunCustomizationProps> = ({
 }) => {
   const [selectedCategory, setSelectedCategory] =
     useState<PartCategory>("barrel");
+  const [gunParts, setGunParts] = useState<GunPart[]>([]);
   const [equippedParts, setEquippedParts] =
     useState<Record<PartCategory, string>>(defaultEquippedParts);
   const [gunStats, setGunStats] = useState({
     damage: 10,
-    accuracy: 70,
-    range: 50,
     fireRate: 60,
-    reloadSpeed: 65,
-    recoil: 40,
     magazineSize: 7,
+    reloadTime: 2.0,
+    recoil: 40,
+    range: 50,
+    accuracy: 70,
+    reloadSpeed: 65,
   });
+
+  // Generate random parts when component mounts
+  useEffect(() => {
+    setGunParts(generateRandomParts());
+  }, []);
 
   // Get parts for the selected category
   const getPartsForCategory = (category: PartCategory) => {
@@ -285,6 +424,7 @@ const GunCustomization: React.FC<GunCustomizationProps> = ({
       reloadSpeed: 65,
       recoil: 40,
       magazineSize: 7,
+      reloadTime: 2.0,
     };
 
     // Apply modifiers from all equipped parts
@@ -295,7 +435,6 @@ const GunCustomization: React.FC<GunCustomizationProps> = ({
           // Convert the new stat format to the old format for compatibility
           let statKey = statItem.name;
           if (statKey === "spread") statKey = "accuracy"; // Spread is the inverse of accuracy
-          if (statKey === "reloadTime") statKey = "reloadSpeed"; // Same stat, different name
 
           if (statKey in baseStats) {
             // For spread/accuracy, the relationship is inverted
@@ -312,27 +451,75 @@ const GunCustomization: React.FC<GunCustomizationProps> = ({
     // Ensure stats stay within reasonable bounds (0-100)
     Object.keys(baseStats).forEach((key) => {
       const stat = key as keyof typeof baseStats;
-      if (stat !== "magazineSize") {
+      if (stat !== "magazineSize" && stat !== "reloadTime") {
         baseStats[stat] = Math.max(0, Math.min(100, baseStats[stat]));
       }
     });
 
     setGunStats(baseStats);
-  }, [equippedParts]);
+  }, [equippedParts, gunParts]);
 
   // Initialize with custom stats if provided
   useEffect(() => {
     if (initialWeaponStats && initialWeaponStats.parts) {
-      setEquippedParts({
-        barrel: initialWeaponStats.parts.barrel || "standard-barrel",
-        slide: initialWeaponStats.parts.slide || "standard-slide",
-        frame: initialWeaponStats.parts.frame || "standard-frame",
-        trigger: initialWeaponStats.parts.trigger || "standard-trigger",
-        magazine: initialWeaponStats.parts.magazine || "standard-magazine",
-        internal: initialWeaponStats.parts.internal || "standard-internal",
-      });
+      // First check if the specific parts exist, otherwise use standard parts
+      const parts = gunParts;
+      if (parts.length > 0) {
+        const newEquippedParts = { ...equippedParts };
+
+        Object.entries(initialWeaponStats.parts).forEach(
+          ([category, partId]) => {
+            // Check if this part exists
+            const partExists = parts.some(
+              (p) => p.id === partId && p.category === category
+            );
+            if (partExists) {
+              newEquippedParts[category as PartCategory] = partId;
+            } else {
+              // Default to standard part if the specific part isn't found
+              newEquippedParts[
+                category as PartCategory
+              ] = `standard-${category}`;
+            }
+          }
+        );
+
+        setEquippedParts(newEquippedParts);
+      }
     }
-  }, [initialWeaponStats]);
+  }, [initialWeaponStats, gunParts]);
+
+  // Replace image paths with appropriate placeholders based on category
+  const getImageForPart = (part: GunPart): string => {
+    const defaultImages: Record<PartCategory, string> = {
+      barrel: "/gun-parts/barrel-standard.png",
+      slide: "/gun-parts/slide-standard.png",
+      frame: "/gun-parts/frame-standard.png",
+      trigger: "/gun-parts/trigger-standard.png",
+      magazine: "/gun-parts/magazine-standard.png",
+      internal: "/gun-parts/internal-standard.png",
+    };
+
+    // For standard parts
+    if (part.id.startsWith("standard-")) {
+      return defaultImages[part.category];
+    }
+
+    // For random parts, use variant image based on prefix
+    const prefix = part.name.split(" ")[0].toLowerCase();
+
+    // Return appropriate image based on part type and name
+    if (prefix.includes("lightweight") || prefix.includes("compact")) {
+      return `/gun-parts/${part.category}-light.png`;
+    } else if (prefix.includes("extended") || prefix.includes("heavy")) {
+      return `/gun-parts/${part.category}-heavy.png`;
+    } else if (prefix.includes("competition") || prefix.includes("match")) {
+      return `/gun-parts/${part.category}-match.png`;
+    }
+
+    // Default image if no match
+    return defaultImages[part.category];
+  };
 
   // Handle equipping a part
   const equipPart = (partId: string) => {
@@ -348,7 +535,7 @@ const GunCustomization: React.FC<GunCustomizationProps> = ({
   // Check if player can afford a part
   const canAfford = (part: GunPart) => {
     if (part.unlocked) return true;
-    return playerCredits >= part.cost;
+    return playerCredits >= part.price;
   };
 
   // Get final weapon stats for saving
@@ -714,7 +901,6 @@ const GunCustomization: React.FC<GunCustomizationProps> = ({
 
             {/* Callouts connecting parts to names when hovering */}
             {Object.keys(partPositions).map((selectedCategory) => {
-              console.log("partPositions", partPositions);
               if (!selectedCategory) return;
               return (
                 <g className="part-callout">
@@ -845,28 +1031,25 @@ const GunCustomization: React.FC<GunCustomizationProps> = ({
                 <div
                   key={part.id}
                   className={`part-item ${isEquipped ? "equipped" : ""} ${
-                    !canBuy ? "locked" : ""
+                    !part.unlocked && !canAfford(part) ? "locked" : ""
                   }`}
-                  onClick={() => canBuy && equipPart(part.id)}
+                  onClick={() => canAfford(part) && equipPart(part.id)}
                 >
-                  <div className="part-image">
-                    <img src={part.image} alt={part.name} />
-                    {isEquipped && (
-                      <div className="equipped-badge">Equipped</div>
-                    )}
-                    {!part.unlocked && (
-                      <div className="cost-badge">{part.cost} Credits</div>
-                    )}
+                  <div className="part-name">{part.name}</div>
+                  <div className="part-description">{part.description}</div>
+                  <div className="part-stats">
+                    {getStatChanges(part).map(renderStatChange)}
                   </div>
-
-                  <div className="part-details">
-                    <h4>{part.name}</h4>
-                    <p>{part.description}</p>
-
-                    <div className="part-stats">
-                      {getStatChanges(part).map(renderStatChange)}
+                  <div className="part-price">
+                    {part.price > 0 ? `${part.price} Credits` : "Free"}
+                  </div>
+                  {!part.unlocked && (
+                    <div className="part-status">
+                      {canAfford(part)
+                        ? "Click to Purchase"
+                        : "Insufficient Credits"}
                     </div>
-                  </div>
+                  )}
                 </div>
               );
             })}
