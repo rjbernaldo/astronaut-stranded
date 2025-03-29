@@ -1216,8 +1216,8 @@ const GunCustomization: React.FC<GunCustomizationProps> = ({
         <div className="gun-image">
           {/* Base pistol image */}
           <svg
-            width="400"
-            height="300"
+            width="350"
+            height="250"
             viewBox="0 0 400 300"
             fill="none"
             xmlns="http://www.w3.org/2000/svg"
