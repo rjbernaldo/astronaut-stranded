@@ -324,7 +324,7 @@ const generateStatsForPart = (category: PartCategory): PartStat[] => {
       // If positive increment, set to at least 1
       if (incrementValue > 0) {
         scaledValue = 1;
-      } 
+      }
       // If negative decrement, set to at least -1
       else if (incrementValue < 0) {
         scaledValue = -1;
@@ -391,13 +391,18 @@ const generateStatsForPart = (category: PartCategory): PartStat[] => {
       } else {
         scaledValue = -Math.floor(decrementPerStat * 3); // Default scaling
       }
-      
+
       // Ensure non-zero values for decrements too
       if (scaledValue === 0) {
         // If supposed to be a negative value, set to -1
-        if (decrementPerStat > 0 && statName !== "reloadTime" && statName !== "spread" && statName !== "recoil") {
+        if (
+          decrementPerStat > 0 &&
+          statName !== "reloadTime" &&
+          statName !== "spread" &&
+          statName !== "recoil"
+        ) {
           scaledValue = -1;
-        } 
+        }
         // If supposed to be positive (for certain stats where higher is worse)
         else if (decrementPerStat > 0) {
           scaledValue = 1;
@@ -1409,13 +1414,14 @@ const GunCustomization: React.FC<GunCustomizationProps> = ({
   // Render stat change for a part
   const renderStatChange = (stat: { name: string; value: number }) => {
     const isPositive = stat.value > 0;
-    const absValue = Math.abs(stat.value);
-    
+    // Round down to integer
+    const absValue = Math.floor(Math.abs(stat.value));
+
     // Calculate the base stat value for percentage calculation
     let baseValue = 10; // Default base value
-    
+
     // Adjust base value based on stat type
-    switch(stat.name) {
+    switch (stat.name) {
       case "damage":
         baseValue = 10;
         break;
@@ -1438,12 +1444,14 @@ const GunCustomization: React.FC<GunCustomizationProps> = ({
         baseValue = 7;
         break;
     }
-    
+
     // Calculate percentage
     const percentage = Math.round((absValue / baseValue) * 100);
-    
+
     // Format display value with percentage
-    const displayValue = isPositive ? `+${absValue} (${percentage}%)` : `-${absValue} (${percentage}%)`;
+    const displayValue = isPositive
+      ? `+${absValue} (${percentage}%)`
+      : `-${absValue} (${percentage}%)`;
 
     return (
       <div
@@ -1486,11 +1494,12 @@ const GunCustomization: React.FC<GunCustomizationProps> = ({
       previewValue !== null && Math.abs(previewValue - currentValue) > 0.01;
     const isPositive = hasChange && previewValue! > currentValue;
     const isNegative = hasChange && previewValue! < currentValue;
-    
+
     // Format with integer values
     const currentInteger = Math.floor(currentValue);
-    const previewInteger = previewValue !== null ? Math.floor(previewValue) : currentInteger;
-    
+    const previewInteger =
+      previewValue !== null ? Math.floor(previewValue) : currentInteger;
+
     const displayValue = previewInteger;
     const barWidth = `${Math.min(
       ((previewValue !== null ? previewValue : currentValue) / maxValue) * 100,
@@ -1498,8 +1507,8 @@ const GunCustomization: React.FC<GunCustomizationProps> = ({
     )}%`;
 
     // Calculate percentage change if there's a change
-    const percentageChange = hasChange 
-      ? Math.round(((previewInteger - currentInteger) / currentInteger) * 100) 
+    const percentageChange = hasChange
+      ? Math.round(((previewInteger - currentInteger) / currentInteger) * 100)
       : 0;
 
     return (
@@ -1539,7 +1548,7 @@ const GunCustomization: React.FC<GunCustomizationProps> = ({
           {hasChange && (
             <span className="stat-change">
               {isPositive ? " +" : " "}
-              {Math.round((previewValue! - currentValue) * 100) / 100}
+              {previewInteger - currentInteger} ({percentageChange}%)
             </span>
           )}
         </span>
