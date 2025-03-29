@@ -418,7 +418,7 @@ const generateStatsForPart = (category: PartCategory): PartStat[] => {
 
 // Function to randomly generate parts
 const generateRandomParts = (): GunPart[] => {
-  const randomParts: GunPart[] = [];
+  const parts: GunPart[] = [];
 
   // Generate standard parts (always available)
   const categories: PartCategory[] = [
@@ -430,9 +430,9 @@ const generateRandomParts = (): GunPart[] => {
     "internal",
   ];
 
+  // Add standard parts
   categories.forEach((category) => {
-    // Add standard part
-    randomParts.push({
+    parts.push({
       id: `standard-${category}`,
       name: `Standard ${category.charAt(0).toUpperCase() + category.slice(1)}`,
       category,
@@ -442,64 +442,64 @@ const generateRandomParts = (): GunPart[] => {
         { name: category === "barrel" ? "damage" : "recoil", value: 0 },
       ],
       description: partDescriptions[category][0],
-      unlocked: true, // Keep for compatibility
-      cost: 0, // Keep for compatibility
-      price: 0, // Keep for compatibility
+      unlocked: true,
+      cost: 0,
+      price: 0,
     });
-
-    // Generate random number of parts per category based on config
-    const minParts = gunCustomizationConfig.partGeneration.minPartsPerCategory;
-    const maxParts = gunCustomizationConfig.partGeneration.maxPartsPerCategory;
-    const numRandomParts =
-      Math.floor(Math.random() * (maxParts - minParts + 1)) + minParts;
-
-    for (let i = 0; i < numRandomParts; i++) {
-      const prefixIndex = Math.floor(
-        Math.random() * partNamePrefixes[category].length
-      );
-      const suffixIndex = Math.floor(
-        Math.random() * partNameSuffixes[category].length
-      );
-
-      // Skip if we generate "Standard [Category]" again
-      if (partNamePrefixes[category][prefixIndex] === "Standard") {
-        continue;
-      }
-
-      const prefix = partNamePrefixes[category][prefixIndex];
-      const suffix = partNameSuffixes[category][suffixIndex];
-      const descIndex = Math.min(
-        prefixIndex,
-        partDescriptions[category].length - 1
-      );
-
-      // Generate stats using the new configuration-based method
-      const stats = generateStatsForPart(category);
-
-      // Calculate price based on the value of the stats
-      const totalPositiveValue = stats.reduce((sum, stat) => {
-        return sum + (stat.value > 0 ? Math.abs(stat.value) : 0);
-      }, 0);
-
-      // Price is related to the total positive value with some randomness
-      const basePrice = Math.round(totalPositiveValue * 50);
-      const price = basePrice + Math.floor(Math.random() * (basePrice / 2));
-
-      randomParts.push({
-        id: `${prefix.toLowerCase()}-${category}`,
-        name: `${prefix} ${suffix}`,
-        category,
-        image: "/gun-parts/internal-standard.png",
-        stats,
-        description: partDescriptions[category][descIndex],
-        unlocked: Math.random() > 0.4, // 60% chance to be unlocked
-        cost: price, // Cost is the same as price
-        price: price, // Set the price
-      });
-    }
   });
 
-  return randomParts;
+  // Generate exactly 3 random parts (one at a time, from random categories)
+  for (let i = 0; i < 3; i++) {
+    // Pick a random category
+    const randomCategoryIndex = Math.floor(Math.random() * categories.length);
+    const category = categories[randomCategoryIndex];
+
+    const prefixIndex = Math.floor(
+      Math.random() * partNamePrefixes[category].length
+    );
+    const suffixIndex = Math.floor(
+      Math.random() * partNameSuffixes[category].length
+    );
+
+    // Skip if we generate "Standard [Category]" again
+    if (partNamePrefixes[category][prefixIndex] === "Standard") {
+      i--; // Try again
+      continue;
+    }
+
+    const prefix = partNamePrefixes[category][prefixIndex];
+    const suffix = partNameSuffixes[category][suffixIndex];
+    const descIndex = Math.min(
+      prefixIndex,
+      partDescriptions[category].length - 1
+    );
+
+    // Generate stats using the configuration-based method
+    const stats = generateStatsForPart(category);
+
+    // Calculate price based on the value of the stats
+    const totalPositiveValue = stats.reduce((sum, stat) => {
+      return sum + (stat.value > 0 ? Math.abs(stat.value) : 0);
+    }, 0);
+
+    // Price is related to the total positive value with some randomness
+    const basePrice = Math.round(totalPositiveValue * 50);
+    const price = basePrice + Math.floor(Math.random() * (basePrice / 2));
+
+    parts.push({
+      id: `${prefix.toLowerCase()}-${category}-${i}`,
+      name: `${prefix} ${suffix}`,
+      category,
+      image: "/gun-parts/internal-standard.png",
+      stats,
+      description: partDescriptions[category][descIndex],
+      unlocked: true, // All parts are unlocked
+      cost: price,
+      price: price,
+    });
+  }
+
+  return parts;
 };
 
 // Default equipped parts (one of each category)
@@ -1582,6 +1582,26 @@ const GunCustomization: React.FC<GunCustomizationProps> = ({
     };
   };
 
+  // Add a function to regenerate parts
+  const regenerateUpgrades = () => {
+    // Keep the currently equipped parts
+    const equippedPartsList = Object.values(equippedParts);
+    const currentEquipped = gunParts.filter((part) =>
+      equippedPartsList.includes(part.id)
+    );
+
+    // Generate new random parts and combine with equipped parts
+    const newRandomParts = generateRandomParts().filter(
+      (part) => !part.id.startsWith("standard-") // Filter out standard parts
+    );
+
+    // Combine standard parts, equipped parts, and new random parts
+    const standardParts = gunParts.filter((part) =>
+      part.id.startsWith("standard-")
+    );
+    setGunParts([...standardParts, ...currentEquipped, ...newRandomParts]);
+  };
+
   return (
     <div className="gun-customization">
       <h1>Gun Customization</h1>
@@ -1634,27 +1654,40 @@ const GunCustomization: React.FC<GunCustomizationProps> = ({
       </div>
 
       <div className="upgrades-section">
-        <h3>Available Upgrades</h3>
-        <div className="upgrade-items">
-          {getAllAvailableParts().map((part) => (
-            <div
-              key={part.id}
-              className="part-item"
-              onClick={() => equipPart(part.id)}
-              onMouseEnter={() => setHoveredPart(part.id)}
-              onMouseLeave={() => setHoveredPart(null)}
-            >
-              <div className="part-name">{part.name}</div>
-              <div className="part-category">
-                {part.category.charAt(0).toUpperCase() + part.category.slice(1)}{" "}
-                Part
+        <div className="upgrades-header">
+          <h3>Available Upgrades</h3>
+          <button className="refresh-btn" onClick={regenerateUpgrades}>
+            New Upgrades
+          </button>
+        </div>
+        <div className="upgrade-row">
+          {gunParts
+            .filter(
+              (part) =>
+                !part.id.startsWith("standard-") &&
+                !Object.values(equippedParts).includes(part.id)
+            )
+            .slice(0, 3)
+            .map((part) => (
+              <div
+                key={part.id}
+                className="part-item"
+                onClick={() => equipPart(part.id)}
+                onMouseEnter={() => setHoveredPart(part.id)}
+                onMouseLeave={() => setHoveredPart(null)}
+              >
+                <div className="part-name">{part.name}</div>
+                <div className="part-category">
+                  {part.category.charAt(0).toUpperCase() +
+                    part.category.slice(1)}{" "}
+                  Part
+                </div>
+                <div className="part-description">{part.description}</div>
+                <div className="part-stats">
+                  {getStatChanges(part).map(renderStatChange)}
+                </div>
               </div>
-              <div className="part-description">{part.description}</div>
-              <div className="part-stats">
-                {getStatChanges(part).map(renderStatChange)}
-              </div>
-            </div>
-          ))}
+            ))}
         </div>
       </div>
 
