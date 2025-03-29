@@ -302,21 +302,33 @@ const generateStatsForPart = (category: PartCategory): PartStat[] => {
     // Scale the increment based on the stat
     let scaledValue;
     if (statName === "magazineSize") {
-      scaledValue = Math.round(incrementValue * 3); // 0.3-6 extra bullets
+      scaledValue = Math.floor(incrementValue * 3); // 0.3-6 extra bullets, rounded down
     } else if (statName === "reloadTime") {
-      scaledValue = -incrementValue * 0.5; // Negative because lower is better for reload time
+      scaledValue = -Math.floor(incrementValue * 0.5); // Negative because lower is better for reload time
     } else if (statName === "fireRate") {
-      scaledValue = incrementValue * 0.2; // 0.02-0.4 fire rate increase
+      scaledValue = Math.floor(incrementValue * 0.2); // 0.02-0.4 fire rate increase
     } else if (statName === "spread") {
-      scaledValue = -incrementValue * 5; // Negative because lower spread is better
+      scaledValue = -Math.floor(incrementValue * 5); // Negative because lower spread is better
     } else if (statName === "damage") {
-      scaledValue = incrementValue * 5; // 0.5-10 damage increase
+      scaledValue = Math.floor(incrementValue * 5); // 0.5-10 damage increase
     } else if (statName === "recoil") {
-      scaledValue = -incrementValue * 5; // Negative because lower recoil is better
+      scaledValue = -Math.floor(incrementValue * 5); // Negative because lower recoil is better
     } else if (statName === "range") {
-      scaledValue = incrementValue * 10; // 1-20 range increase
+      scaledValue = Math.floor(incrementValue * 10); // 1-20 range increase
     } else {
-      scaledValue = incrementValue * 5; // Default scaling
+      scaledValue = Math.floor(incrementValue * 5); // Default scaling
+    }
+
+    // Ensure we don't have zero values due to rounding down
+    if (scaledValue === 0) {
+      // If positive increment, set to at least 1
+      if (incrementValue > 0) {
+        scaledValue = 1;
+      } 
+      // If negative decrement, set to at least -1
+      else if (incrementValue < 0) {
+        scaledValue = -1;
+      }
     }
 
     stats.push({ name: statName, value: scaledValue });
@@ -363,21 +375,33 @@ const generateStatsForPart = (category: PartCategory): PartStat[] => {
       // Scale the decrement based on the stat
       let scaledValue;
       if (statName === "magazineSize") {
-        scaledValue = -Math.round(decrementPerStat * 2); // 0.2-2 fewer bullets
+        scaledValue = -Math.floor(decrementPerStat * 2); // 0.2-2 fewer bullets
       } else if (statName === "reloadTime") {
-        scaledValue = decrementPerStat * 0.3; // Positive because higher is worse for reload time
+        scaledValue = Math.floor(decrementPerStat * 0.3); // Positive because higher is worse for reload time
       } else if (statName === "fireRate") {
-        scaledValue = -decrementPerStat * 0.1; // 0.01-0.1 fire rate decrease
+        scaledValue = -Math.floor(decrementPerStat * 0.1); // 0.01-0.1 fire rate decrease
       } else if (statName === "spread") {
-        scaledValue = decrementPerStat * 3; // Positive because higher spread is worse
+        scaledValue = Math.floor(decrementPerStat * 3); // Positive because higher spread is worse
       } else if (statName === "damage") {
-        scaledValue = -decrementPerStat * 3; // 0.3-3 damage decrease
+        scaledValue = -Math.floor(decrementPerStat * 3); // 0.3-3 damage decrease
       } else if (statName === "recoil") {
-        scaledValue = decrementPerStat * 3; // Positive because higher recoil is worse
+        scaledValue = Math.floor(decrementPerStat * 3); // Positive because higher recoil is worse
       } else if (statName === "range") {
-        scaledValue = -decrementPerStat * 5; // 0.5-5 range decrease
+        scaledValue = -Math.floor(decrementPerStat * 5); // 0.5-5 range decrease
       } else {
-        scaledValue = -decrementPerStat * 3; // Default scaling
+        scaledValue = -Math.floor(decrementPerStat * 3); // Default scaling
+      }
+      
+      // Ensure non-zero values for decrements too
+      if (scaledValue === 0) {
+        // If supposed to be a negative value, set to -1
+        if (decrementPerStat > 0 && statName !== "reloadTime" && statName !== "spread" && statName !== "recoil") {
+          scaledValue = -1;
+        } 
+        // If supposed to be positive (for certain stats where higher is worse)
+        else if (decrementPerStat > 0) {
+          scaledValue = 1;
+        }
       }
 
       stats.push({ name: statName, value: scaledValue });
@@ -1385,7 +1409,41 @@ const GunCustomization: React.FC<GunCustomizationProps> = ({
   // Render stat change for a part
   const renderStatChange = (stat: { name: string; value: number }) => {
     const isPositive = stat.value > 0;
-    const displayValue = isPositive ? `+${stat.value}` : stat.value;
+    const absValue = Math.abs(stat.value);
+    
+    // Calculate the base stat value for percentage calculation
+    let baseValue = 10; // Default base value
+    
+    // Adjust base value based on stat type
+    switch(stat.name) {
+      case "damage":
+        baseValue = 10;
+        break;
+      case "accuracy":
+        baseValue = 70;
+        break;
+      case "range":
+        baseValue = 50;
+        break;
+      case "fireRate":
+        baseValue = 60;
+        break;
+      case "reload speed":
+        baseValue = 65;
+        break;
+      case "recoil":
+        baseValue = 40;
+        break;
+      case "magazineSize":
+        baseValue = 7;
+        break;
+    }
+    
+    // Calculate percentage
+    const percentage = Math.round((absValue / baseValue) * 100);
+    
+    // Format display value with percentage
+    const displayValue = isPositive ? `+${absValue} (${percentage}%)` : `-${absValue} (${percentage}%)`;
 
     return (
       <div
@@ -1422,20 +1480,27 @@ const GunCustomization: React.FC<GunCustomizationProps> = ({
     currentValue: number,
     previewValue: number | null = null,
     maxValue: number = 100,
-    formatValue: (v: number) => string | number = (v) => v
+    formatValue: (v: number) => string | number = (v) => Math.floor(v)
   ) => {
     const hasChange =
       previewValue !== null && Math.abs(previewValue - currentValue) > 0.01;
     const isPositive = hasChange && previewValue! > currentValue;
     const isNegative = hasChange && previewValue! < currentValue;
-    const displayValue =
-      previewValue !== null
-        ? formatValue(previewValue)
-        : formatValue(currentValue);
+    
+    // Format with integer values
+    const currentInteger = Math.floor(currentValue);
+    const previewInteger = previewValue !== null ? Math.floor(previewValue) : currentInteger;
+    
+    const displayValue = previewInteger;
     const barWidth = `${Math.min(
       ((previewValue !== null ? previewValue : currentValue) / maxValue) * 100,
       100
     )}%`;
+
+    // Calculate percentage change if there's a change
+    const percentageChange = hasChange 
+      ? Math.round(((previewInteger - currentInteger) / currentInteger) * 100) 
+      : 0;
 
     return (
       <div className="stat-bar">
