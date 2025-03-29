@@ -10,8 +10,8 @@ export class GameMap {
 
   constructor(seed: string) {
     this.tileSize = 32;
-    this.width = Math.floor(10000 / this.tileSize); // 312 tiles
-    this.height = Math.floor(10000 / this.tileSize); // 312 tiles
+    this.width = Math.floor(20000 / this.tileSize); // 625 tiles
+    this.height = Math.floor(20000 / this.tileSize); // 625 tiles
     this.tiles = this.generateMap(seed);
     this.exitPosition = { x: 0, y: 0 };
   }
@@ -20,22 +20,16 @@ export class GameMap {
     const rng = seedrandom(seed);
     const map: Tile[][] = [];
 
-    // Initialize map with floor tiles
+    // Initialize map with all floor tiles - creating one big open area
     for (let y = 0; y < this.height; y++) {
       map[y] = [];
       for (let x = 0; x < this.width; x++) {
         map[y][x] = {
           type: "floor",
-          explored: false,
+          explored: true, // Make all tiles visible immediately
         };
       }
     }
-
-    // Generate walls
-    this.generateWalls(map, rng);
-
-    // Generate hazards
-    this.generateHazards(map, rng);
 
     // Place exit
     this.placeExit(map, rng);
@@ -43,97 +37,25 @@ export class GameMap {
     return map;
   }
 
+  // This method is now empty since we don't want any walls
   generateWalls(map: Tile[][], rng: seedrandom.PRNG): void {
-    // Create some large wall structures
-    for (let i = 0; i < 50; i++) {
-      const startX = Math.floor(rng() * this.width);
-      const startY = Math.floor(rng() * this.height);
-      const size = 10 + Math.floor(rng() * 20);
-
-      for (let y = 0; y < size; y++) {
-        for (let x = 0; x < size; x++) {
-          const mapX = (startX + x) % this.width;
-          const mapY = (startY + y) % this.height;
-
-          // Create hollow structures (only edges are walls)
-          if (x === 0 || y === 0 || x === size - 1 || y === size - 1) {
-            map[mapY][mapX].type = "wall";
-          }
-        }
-      }
-    }
-
-    // Create some scattered walls
-    for (let i = 0; i < this.width * this.height * 0.1; i++) {
-      const x = Math.floor(rng() * this.width);
-      const y = Math.floor(rng() * this.height);
-      map[y][x].type = "wall";
-    }
+    // No walls to generate - empty method
   }
 
+  // This method is now empty since we don't want any hazards
   generateHazards(map: Tile[][], rng: seedrandom.PRNG): void {
-    // Create acid pools
-    for (let i = 0; i < 20; i++) {
-      const centerX = Math.floor(rng() * this.width);
-      const centerY = Math.floor(rng() * this.height);
-      const radius = 3 + Math.floor(rng() * 5);
-
-      for (let y = -radius; y <= radius; y++) {
-        for (let x = -radius; x <= radius; x++) {
-          const mapX = (centerX + x + this.width) % this.width;
-          const mapY = (centerY + y + this.height) % this.height;
-
-          // Create circular hazard pools
-          const distance = Math.sqrt(x * x + y * y);
-          if (
-            distance < radius &&
-            map[mapY][mapX].type === "floor" &&
-            rng() < 0.7
-          ) {
-            map[mapY][mapX].type = "hazard";
-          }
-        }
-      }
-    }
+    // No hazards to generate - empty method
   }
 
   placeExit(map: Tile[][], rng: seedrandom.PRNG): void {
     // Place exit far from center (coordinates 0,0)
-    let attempts = 0;
-    let placed = false;
-
-    while (!placed && attempts < 100) {
-      const x = Math.floor(rng() * this.width);
-      const y = Math.floor(rng() * this.height);
-
-      // Distance in tiles
-      const distanceFromCenter = Math.sqrt(
-        (x - this.width / 2) ** 2 + (y - this.height / 2) ** 2
-      );
-
-      // Make sure exit is far from center and on a floor tile
-      if (distanceFromCenter > this.width / 3 && map[y][x].type === "floor") {
-        map[y][x].type = "exit";
-        this.exitPosition = {
-          x: x * this.tileSize + this.tileSize / 2,
-          y: y * this.tileSize + this.tileSize / 2,
-        };
-        placed = true;
-      }
-
-      attempts++;
-    }
-
-    // Fallback if exit placement failed
-    if (!placed) {
-      const x = Math.floor(this.width * 0.8);
-      const y = Math.floor(this.height * 0.8);
-      map[y][x].type = "exit";
-      this.exitPosition = {
-        x: x * this.tileSize + this.tileSize / 2,
-        y: y * this.tileSize + this.tileSize / 2,
-      };
-    }
+    const x = Math.floor(this.width * 0.8);
+    const y = Math.floor(this.height * 0.8);
+    map[y][x].type = "exit";
+    this.exitPosition = {
+      x: x * this.tileSize + this.tileSize / 2,
+      y: y * this.tileSize + this.tileSize / 2,
+    };
   }
 
   getTileAt(worldX: number, worldY: number): Tile | null {
@@ -163,6 +85,8 @@ export class GameMap {
   }
 
   setTileExplored(worldX: number, worldY: number, radius: number): void {
+    // With all tiles already explored, this method doesn't need to do anything
+    // But keeping it for compatibility with existing code
     const centerTileX = Math.floor(worldX / this.tileSize);
     const centerTileY = Math.floor(worldY / this.tileSize);
     const tileRadius = Math.ceil(radius / this.tileSize);
@@ -178,10 +102,7 @@ export class GameMap {
           tileY >= 0 &&
           tileY < this.height
         ) {
-          const distance = Math.sqrt(x * x + y * y);
-          if (distance <= tileRadius) {
-            this.tiles[tileY][tileX].explored = true;
-          }
+          this.tiles[tileY][tileX].explored = true;
         }
       }
     }
@@ -221,107 +142,45 @@ export class GameMap {
 
         const tile = this.tiles[y][x];
 
-        if (tile.explored) {
-          // Set tile color based on type
-          switch (tile.type) {
-            case "floor":
-              ctx.fillStyle = "#1A1A1A"; // Dark gray floor
-              break;
-            case "wall":
-              ctx.fillStyle = "#333333"; // Lighter gray wall
-              break;
-            case "hazard":
-              ctx.fillStyle = "#336633"; // Dark green acid
-              break;
-            case "exit":
-              ctx.fillStyle = "#4444AA"; // Blue-ish exit
-              break;
-          }
-
-          // Draw tile
-          ctx.fillRect(screenX, screenY, this.tileSize, this.tileSize);
-
-          // Add some visual details based on tile type
-          if (tile.type === "wall") {
-            // Add some grime texture to walls
-            ctx.fillStyle = "rgba(30, 30, 30, 0.5)";
-            ctx.fillRect(
-              screenX + 2,
-              screenY + 2,
-              this.tileSize - 4,
-              this.tileSize - 4
-            );
-          } else if (tile.type === "hazard") {
-            // Add bubbling effect to acid
-            for (let i = 0; i < 5; i++) {
-              const bubbleX = screenX + Math.random() * this.tileSize;
-              const bubbleY = screenY + Math.random() * this.tileSize;
-              const bubbleSize = 1 + Math.random() * 3;
-
-              ctx.fillStyle = "rgba(100, 255, 100, 0.7)";
-              ctx.beginPath();
-              ctx.arc(bubbleX, bubbleY, bubbleSize, 0, Math.PI * 2);
-              ctx.fill();
-            }
-          } else if (tile.type === "exit") {
-            // Draw exit marker
-            ctx.fillStyle = "#AAAAFF";
-            ctx.beginPath();
-            ctx.arc(
-              screenX + this.tileSize / 2,
-              screenY + this.tileSize / 2,
-              this.tileSize / 3,
-              0,
-              Math.PI * 2
-            );
-            ctx.fill();
-
-            // Add an "E" label
-            ctx.fillStyle = "#000000";
-            ctx.font = "bold 16px Arial";
-            ctx.textAlign = "center";
-            ctx.textBaseline = "middle";
-            ctx.fillText(
-              "E",
-              screenX + this.tileSize / 2,
-              screenY + this.tileSize / 2
-            );
-          }
-
-          // Add grid lines for visibility
-          ctx.strokeStyle = "rgba(50, 50, 50, 0.2)";
-          ctx.strokeRect(screenX, screenY, this.tileSize, this.tileSize);
+        // Set tile color based on type
+        switch (tile.type) {
+          case "floor":
+            ctx.fillStyle = "#1A1A1A"; // Dark gray floor
+            break;
+          case "wall":
+            ctx.fillStyle = "#333333"; // Lighter gray wall
+            break;
+          case "hazard":
+            ctx.fillStyle = "#336633"; // Dark green acid
+            break;
+          case "exit":
+            ctx.fillStyle = "#4444AA"; // Blue-ish exit
+            break;
         }
+
+        // Draw tile
+        ctx.fillRect(screenX, screenY, this.tileSize, this.tileSize);
+
+        // Add exit marker if this is the exit tile
+        if (tile.type === "exit") {
+          // Draw exit marker
+          ctx.fillStyle = "rgba(100, 180, 255, 0.7)";
+          ctx.beginPath();
+          ctx.arc(
+            screenX + this.tileSize / 2,
+            screenY + this.tileSize / 2,
+            this.tileSize / 3,
+            0,
+            Math.PI * 2
+          );
+          ctx.fill();
+        }
+
+        // Add a grid pattern overlay to help visually define the tiles
+        ctx.strokeStyle = "rgba(50, 50, 50, 0.3)";
+        ctx.lineWidth = 1;
+        ctx.strokeRect(screenX, screenY, this.tileSize, this.tileSize);
       }
     }
-  }
-
-  // Add a method to get wall positions for collision detection and line of sight
-  getWalls(): Position[][] {
-    const walls: Position[][] = [];
-
-    // Convert tiles to wall polygons
-    this.tiles.forEach((row, y) => {
-      row.forEach((tile, x) => {
-        // Skip non-wall tiles
-        if (tile.type !== "wall") return;
-
-        // Convert tile to world coordinates
-        const tileX = x * this.tileSize;
-        const tileY = y * this.tileSize;
-
-        // Create a polygon for the wall (4 corners)
-        const wallPolygon: Position[] = [
-          { x: tileX, y: tileY }, // Top-left
-          { x: tileX + this.tileSize, y: tileY }, // Top-right
-          { x: tileX + this.tileSize, y: tileY + this.tileSize }, // Bottom-right
-          { x: tileX, y: tileY + this.tileSize }, // Bottom-left
-        ];
-
-        walls.push(wallPolygon);
-      });
-    });
-
-    return walls;
   }
 }

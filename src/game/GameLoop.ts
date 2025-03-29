@@ -21,7 +21,7 @@ export class GameLoop {
   private mousePosition: Position = { x: 0, y: 0 };
   private mouseDown: boolean = false;
 
-  private astronaut: Astronaut;
+  private player: Astronaut;
   private map: GameMap;
   private enemies: Enemy[] = [];
   private projectiles: Projectile[] = [];
@@ -52,10 +52,10 @@ export class GameLoop {
     // Create player in the center of the map
     const startX = Math.floor(this.map.width / 2) * this.map.tileSize;
     const startY = Math.floor(this.map.height / 2) * this.map.tileSize;
-    this.astronaut = new Astronaut({ x: startX, y: startY });
+    this.player = new Astronaut({ x: startX, y: startY });
 
     // Set camera to player position
-    this.cameraPosition = { ...this.astronaut.position };
+    this.cameraPosition = { ...this.player.position };
 
     // Set up event listeners
     this.setupEventListeners();
@@ -68,16 +68,16 @@ export class GameLoop {
 
       // Reload on 'r' press
       if (e.key.toLowerCase() === "r") {
-        this.astronaut.reload();
+        this.player.reload();
       }
 
       // Weapon switching
       if (e.key === "1") {
-        this.astronaut.switchWeapon("pistol");
+        this.player.switchWeapon("pistol");
       } else if (e.key === "2") {
-        this.astronaut.switchWeapon("rifle");
+        this.player.switchWeapon("rifle");
       } else if (e.key === "3") {
-        this.astronaut.switchWeapon("shotgun");
+        this.player.switchWeapon("shotgun");
       }
     });
 
@@ -149,22 +149,15 @@ export class GameLoop {
     this.handleInput(deltaTime, timestamp);
 
     // Update player
-    this.astronaut.update(deltaTime, timestamp);
+    this.player.update(deltaTime, timestamp);
 
     // Check if player is on hazard tile
-    if (
-      this.map.isTileHazard(
-        this.astronaut.position.x,
-        this.astronaut.position.y
-      )
-    ) {
-      this.astronaut.takeDamage(10 * deltaTime); // Damage over time
+    if (this.map.isTileHazard(this.player.position.x, this.player.position.y)) {
+      this.player.takeDamage(10 * deltaTime); // Damage over time
     }
 
     // Check if player reached the exit
-    if (
-      this.map.isTileExit(this.astronaut.position.x, this.astronaut.position.y)
-    ) {
+    if (this.map.isTileExit(this.player.position.x, this.player.position.y)) {
       this.gameState.hasWon = true;
       this.gameState.isGameOver = true;
       return;
@@ -181,19 +174,19 @@ export class GameLoop {
 
     // Auto-explore map around player
     this.map.setTileExplored(
-      this.astronaut.position.x,
-      this.astronaut.position.y,
-      this.astronaut.lightRadius
+      this.player.position.x,
+      this.player.position.y,
+      this.player.lightRadius
     );
 
     // Update camera position (follow player)
     this.cameraPosition = {
-      x: this.astronaut.position.x,
-      y: this.astronaut.position.y,
+      x: this.player.position.x,
+      y: this.player.position.y,
     };
 
     // Check game over condition
-    if (this.astronaut.health <= 0) {
+    if (this.player.health <= 0) {
       this.gameState.isGameOver = true;
     }
   }
@@ -227,9 +220,9 @@ export class GameLoop {
     deltaTime: number
   ): void {
     // Calculate next position
-    let nextX = this.astronaut.position.x;
-    let nextY = this.astronaut.position.y;
-    const movementDistance = this.astronaut.speed * deltaTime;
+    let nextX = this.player.position.x;
+    let nextY = this.player.position.y;
+    const movementDistance = this.player.speed * deltaTime;
 
     switch (direction) {
       case "up":
@@ -248,7 +241,7 @@ export class GameLoop {
 
     // Check collision with walls
     if (this.map.isTileWalkable(nextX, nextY)) {
-      this.astronaut.move(direction, deltaTime);
+      this.player.move(direction, deltaTime);
     }
   }
 
@@ -264,19 +257,19 @@ export class GameLoop {
     const angle = Math.atan2(dy, dx) * (180 / Math.PI);
 
     // Set player rotation
-    this.astronaut.setRotation(angle);
+    this.player.setRotation(angle);
   }
 
   private shoot(timestamp: number): void {
-    if (!this.astronaut.activeWeapon) return;
+    if (!this.player.activeWeapon) return;
 
-    const didShoot = this.astronaut.shoot(timestamp);
+    const didShoot = this.player.shoot(timestamp);
 
     if (didShoot) {
       // Create projectiles
-      const newProjectiles = this.astronaut.activeWeapon.createProjectiles(
-        { ...this.astronaut.position },
-        this.astronaut.rotation
+      const newProjectiles = this.player.activeWeapon.createProjectiles(
+        { ...this.player.position },
+        this.player.rotation
       );
 
       // Add to projectiles array
@@ -326,97 +319,26 @@ export class GameLoop {
   }
 
   private updateEnemies(deltaTime: number, timestamp: number): void {
-    // Create a reference to the map walls for enemy line of sight
-    const walls = this.map.getWalls();
-
     // Update each enemy
-    this.enemies.forEach((enemy) => {
-      enemy.update(deltaTime, this.astronaut.position, timestamp, walls);
+    for (const enemy of this.enemies) {
+      if (!enemy.active) continue;
 
-      // Check for collision with player
-      const distanceToPlayer = Math.sqrt(
-        Math.pow(this.astronaut.position.x - enemy.position.x, 2) +
-          Math.pow(this.astronaut.position.y - enemy.position.y, 2)
-      );
+      // Pass camera offset so enemies can be drawn correctly
+      enemy.update(deltaTime, this.player.position, timestamp);
 
-      // If enemy touches player and can attack, deal damage
-      if (distanceToPlayer < enemy.attackRange && enemy.canAttack(timestamp)) {
+      // Check for attack range
+      const dx = this.player.position.x - enemy.position.x;
+      const dy = this.player.position.y - enemy.position.y;
+      const distance = Math.sqrt(dx * dx + dy * dy);
+
+      if (distance < enemy.attackRange && enemy.canAttack(timestamp)) {
         const damage = enemy.attack(timestamp);
-        this.astronaut.takeDamage(damage);
-      }
-
-      // Check for collision with walls
-      this.handleEnemyWallCollisions(enemy);
-    });
-
-    // Filter out inactive enemies
-    this.enemies = this.enemies.filter((enemy) => enemy.active);
-  }
-
-  private handleEnemyWallCollisions(enemy: Enemy): void {
-    const walls = this.map.getWalls();
-    const enemyRadius =
-      enemy.type === "Brute" ? 25 : enemy.type === "Spitter" ? 20 : 15;
-
-    for (const wall of walls) {
-      // For each wall segment, check for collision
-      for (let i = 0; i < wall.length; i++) {
-        const p1 = wall[i];
-        const p2 = wall[(i + 1) % wall.length];
-
-        // Calculate the closest point on the line segment to the enemy
-        const dx = p2.x - p1.x;
-        const dy = p2.y - p1.y;
-        const length = Math.sqrt(dx * dx + dy * dy);
-
-        if (length === 0) continue; // Skip if line segment has zero length
-
-        // Normalize the direction vector
-        const nx = dx / length;
-        const ny = dy / length;
-
-        // Calculate the projection of the vector from p1 to enemy onto the line segment
-        const projectionLength =
-          (enemy.position.x - p1.x) * nx + (enemy.position.y - p1.y) * ny;
-
-        // Clamp the projection to the line segment
-        const clampedProjection = Math.max(
-          0,
-          Math.min(length, projectionLength)
-        );
-
-        // Calculate the closest point on the line segment
-        const closestX = p1.x + clampedProjection * nx;
-        const closestY = p1.y + clampedProjection * ny;
-
-        // Calculate the distance from the enemy to the closest point
-        const distanceX = enemy.position.x - closestX;
-        const distanceY = enemy.position.y - closestY;
-        const distance = Math.sqrt(
-          distanceX * distanceX + distanceY * distanceY
-        );
-
-        // If the enemy is colliding with the wall, push it away
-        if (distance < enemyRadius) {
-          // Calculate the push direction
-          const pushDistance = enemyRadius - distance;
-
-          if (distance > 0) {
-            const pushX = (distanceX / distance) * pushDistance;
-            const pushY = (distanceY / distance) * pushDistance;
-
-            // Push the enemy away from the wall
-            enemy.position.x += pushX;
-            enemy.position.y += pushY;
-          } else {
-            // If the distance is zero, push in a random direction
-            const angle = Math.random() * Math.PI * 2;
-            enemy.position.x += Math.cos(angle) * enemyRadius;
-            enemy.position.y += Math.sin(angle) * enemyRadius;
-          }
-        }
+        this.player.takeDamage(damage);
       }
     }
+
+    // Remove dead enemies
+    this.enemies = this.enemies.filter((e) => e.active);
   }
 
   private spawnEnemies(timestamp: number): void {
@@ -444,8 +366,8 @@ export class GameLoop {
       const angle = this.rng() * Math.PI * 2;
       const distance = 300 + this.rng() * 200; // Just outside light radius
 
-      const spawnX = this.astronaut.position.x + Math.cos(angle) * distance;
-      const spawnY = this.astronaut.position.y + Math.sin(angle) * distance;
+      const spawnX = this.player.position.x + Math.cos(angle) * distance;
+      const spawnY = this.player.position.y + Math.sin(angle) * distance;
 
       // Skip if spawn position is a wall
       if (!this.map.isTileWalkable(spawnX, spawnY)) continue;
@@ -476,7 +398,7 @@ export class GameLoop {
           stats = {
             type: "Scout",
             health: 20,
-            speed: 2.5, // Increased speed to hunt better
+            speed: this.player.speed * 0.8, // 80% of player's speed
             attackRange: 20,
             attackDamage: 10,
             attackSpeed: 1,
@@ -486,7 +408,7 @@ export class GameLoop {
           stats = {
             type: "Brute",
             health: 50,
-            speed: 1.5, // Increased speed to hunt better
+            speed: this.player.speed * 0.6, // 60% of player's speed (slower)
             attackRange: 25,
             attackDamage: 20,
             attackSpeed: 2,
@@ -496,7 +418,7 @@ export class GameLoop {
           stats = {
             type: "Spitter",
             health: 30,
-            speed: 2, // Increased speed to hunt better
+            speed: this.player.speed * 0.7, // 70% of player's speed
             attackRange: 100, // Ranged attack
             attackDamage: 5,
             attackSpeed: 1.5,
@@ -568,7 +490,7 @@ export class GameLoop {
     this.ctx.fill();
 
     // Draw player direction (gun)
-    const radians = (this.astronaut.rotation * Math.PI) / 180;
+    const radians = (this.player.rotation * Math.PI) / 180;
     this.ctx.strokeStyle = "#FFFFFF";
     this.ctx.lineWidth = 3;
     this.ctx.beginPath();
@@ -595,7 +517,7 @@ export class GameLoop {
     this.ctx.fillStyle = "#333333";
     this.ctx.fillRect(padding, padding, barWidth, barHeight);
 
-    const healthPercent = this.astronaut.health / 100;
+    const healthPercent = this.player.health / 100;
     this.ctx.fillStyle = `rgb(${255 - healthPercent * 255}, ${
       healthPercent * 255
     }, 0)`;
@@ -609,16 +531,16 @@ export class GameLoop {
     this.ctx.font = "16px monospace";
     this.ctx.textAlign = "left";
     this.ctx.fillText(
-      `Health: ${Math.floor(this.astronaut.health)}`,
+      `Health: ${Math.floor(this.player.health)}`,
       padding + 10,
       padding + 15
     );
 
     // Draw ammo counter
-    if (this.astronaut.activeWeapon) {
-      const weaponName = this.astronaut.activeWeapon.stats.name;
-      const currentAmmo = this.astronaut.ammo.get(weaponName) || 0;
-      const reserveAmmo = this.astronaut.reserves.get(weaponName) || 0;
+    if (this.player.activeWeapon) {
+      const weaponName = this.player.activeWeapon.stats.name;
+      const currentAmmo = this.player.ammo.get(weaponName) || 0;
+      const reserveAmmo = this.player.reserves.get(weaponName) || 0;
 
       this.ctx.fillStyle = "#FFFFFF";
       this.ctx.font = "24px monospace";
@@ -677,8 +599,8 @@ export class GameLoop {
 
     // Draw player position
     const mapRatio = 10000 / width; // Map size to mini-map size
-    const playerX = x + this.astronaut.position.x / mapRatio;
-    const playerY = y + this.astronaut.position.y / mapRatio;
+    const playerX = x + this.player.position.x / mapRatio;
+    const playerY = y + this.player.position.y / mapRatio;
 
     this.ctx.fillStyle = "#FFFFFF";
     this.ctx.beginPath();
