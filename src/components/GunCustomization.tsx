@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { WeaponStats } from "../types";
+import { gunCustomizationConfig } from "../config/gunCustomizationConfig";
 
 // Define part categories
 type PartCategory =
@@ -231,6 +232,161 @@ const partDescriptions: Record<PartCategory, string[]> = {
   ],
 };
 
+// Function to generate random stat modifications according to config rules
+const generateStatsForPart = (category: PartCategory): PartStat[] => {
+  const possibleStats: Record<PartCategory, StatName[]> = {
+    barrel: ["damage", "range", "recoil", "spread"],
+    slide: ["fireRate", "recoil", "spread"],
+    frame: ["recoil", "fireRate", "damage"],
+    trigger: ["fireRate", "spread", "reloadTime"],
+    magazine: ["magazineSize", "reloadTime"],
+    internal: ["damage", "spread", "fireRate", "recoil"],
+  };
+
+  // Get all available stats for this category
+  const availableStats = [...possibleStats[category]];
+  const stats: PartStat[] = [];
+
+  // Determine how many stats to increment based on probabilities
+  const incrementRoll = Math.random();
+  let numStatsToIncrement = 1; // Default to 1
+
+  if (
+    incrementRoll < gunCustomizationConfig.statIncrements.threeStatProbability
+  ) {
+    numStatsToIncrement = 3;
+  } else if (
+    incrementRoll <
+    gunCustomizationConfig.statIncrements.threeStatProbability +
+      gunCustomizationConfig.statIncrements.twoStatProbability
+  ) {
+    numStatsToIncrement = 2;
+  }
+
+  // Limit by available stats
+  numStatsToIncrement = Math.min(numStatsToIncrement, availableStats.length);
+
+  // Generate the positive stat changes
+  let totalIncrementPercentage = 0;
+  for (let i = 0; i < numStatsToIncrement; i++) {
+    if (availableStats.length === 0) break;
+
+    // Pick a random stat
+    const statIndex = Math.floor(Math.random() * availableStats.length);
+    const statName = availableStats[statIndex];
+    availableStats.splice(statIndex, 1); // Remove so we don't pick it again
+
+    // Determine if this will be a large increment
+    const isLargeIncrement =
+      Math.random() <
+      gunCustomizationConfig.incrementAmounts.largeIncrementProbability;
+
+    // Calculate the increment value
+    let incrementValue;
+    if (isLargeIncrement) {
+      // 110% to 200% increase
+      incrementValue =
+        Math.random() *
+          (gunCustomizationConfig.incrementAmounts.maxLargeIncrement -
+            gunCustomizationConfig.incrementAmounts.minLargeIncrement) +
+        gunCustomizationConfig.incrementAmounts.minLargeIncrement;
+    } else {
+      // 10% to 100% increase
+      incrementValue =
+        Math.random() *
+          (gunCustomizationConfig.incrementAmounts.maxNormalIncrement -
+            gunCustomizationConfig.incrementAmounts.minNormalIncrement) +
+        gunCustomizationConfig.incrementAmounts.minNormalIncrement;
+    }
+
+    // Scale the increment based on the stat
+    let scaledValue;
+    if (statName === "magazineSize") {
+      scaledValue = Math.round(incrementValue * 3); // 0.3-6 extra bullets
+    } else if (statName === "reloadTime") {
+      scaledValue = -incrementValue * 0.5; // Negative because lower is better for reload time
+    } else if (statName === "fireRate") {
+      scaledValue = incrementValue * 0.2; // 0.02-0.4 fire rate increase
+    } else if (statName === "spread") {
+      scaledValue = -incrementValue * 5; // Negative because lower spread is better
+    } else if (statName === "damage") {
+      scaledValue = incrementValue * 5; // 0.5-10 damage increase
+    } else if (statName === "recoil") {
+      scaledValue = -incrementValue * 5; // Negative because lower recoil is better
+    } else if (statName === "range") {
+      scaledValue = incrementValue * 10; // 1-20 range increase
+    } else {
+      scaledValue = incrementValue * 5; // Default scaling
+    }
+
+    stats.push({ name: statName, value: scaledValue });
+    totalIncrementPercentage += incrementValue;
+  }
+
+  // Determine if we should decrement stats
+  const decrementRoll = Math.random();
+  let numStatsToDecrement = 0;
+
+  if (
+    decrementRoll < gunCustomizationConfig.statDecrements.twoStatProbability
+  ) {
+    numStatsToDecrement = 2;
+  } else if (
+    decrementRoll <
+    gunCustomizationConfig.statDecrements.twoStatProbability +
+      gunCustomizationConfig.statDecrements.oneStatProbability
+  ) {
+    numStatsToDecrement = 1;
+  }
+
+  // Apply decrements if needed
+  if (numStatsToDecrement > 0 && availableStats.length > 0) {
+    // Calculate total decrement based on increments
+    const decrementPercentage =
+      totalIncrementPercentage *
+      (Math.random() *
+        (gunCustomizationConfig.decrementSizing.maxPercentOfIncrement -
+          gunCustomizationConfig.decrementSizing.minPercentOfIncrement) +
+        gunCustomizationConfig.decrementSizing.minPercentOfIncrement);
+
+    // Distribute decrement across chosen stats
+    const decrementPerStat = decrementPercentage / numStatsToDecrement;
+
+    for (let i = 0; i < numStatsToDecrement; i++) {
+      if (availableStats.length === 0) break;
+
+      // Pick a random stat
+      const statIndex = Math.floor(Math.random() * availableStats.length);
+      const statName = availableStats[statIndex];
+      availableStats.splice(statIndex, 1); // Remove so we don't pick it again
+
+      // Scale the decrement based on the stat
+      let scaledValue;
+      if (statName === "magazineSize") {
+        scaledValue = -Math.round(decrementPerStat * 2); // 0.2-2 fewer bullets
+      } else if (statName === "reloadTime") {
+        scaledValue = decrementPerStat * 0.3; // Positive because higher is worse for reload time
+      } else if (statName === "fireRate") {
+        scaledValue = -decrementPerStat * 0.1; // 0.01-0.1 fire rate decrease
+      } else if (statName === "spread") {
+        scaledValue = decrementPerStat * 3; // Positive because higher spread is worse
+      } else if (statName === "damage") {
+        scaledValue = -decrementPerStat * 3; // 0.3-3 damage decrease
+      } else if (statName === "recoil") {
+        scaledValue = decrementPerStat * 3; // Positive because higher recoil is worse
+      } else if (statName === "range") {
+        scaledValue = -decrementPerStat * 5; // 0.5-5 range decrease
+      } else {
+        scaledValue = -decrementPerStat * 3; // Default scaling
+      }
+
+      stats.push({ name: statName, value: scaledValue });
+    }
+  }
+
+  return stats;
+};
+
 // Function to randomly generate parts
 const generateRandomParts = (): GunPart[] => {
   const randomParts: GunPart[] = [];
@@ -262,8 +418,11 @@ const generateRandomParts = (): GunPart[] => {
       price: 0, // Keep for compatibility
     });
 
-    // Generate 2-4 random parts per category
-    const numRandomParts = Math.floor(Math.random() * 3) + 2; // 2-4 parts
+    // Generate random number of parts per category based on config
+    const minParts = gunCustomizationConfig.partGeneration.minPartsPerCategory;
+    const maxParts = gunCustomizationConfig.partGeneration.maxPartsPerCategory;
+    const numRandomParts =
+      Math.floor(Math.random() * (maxParts - minParts + 1)) + minParts;
 
     for (let i = 0; i < numRandomParts; i++) {
       const prefixIndex = Math.floor(
@@ -285,47 +444,17 @@ const generateRandomParts = (): GunPart[] => {
         partDescriptions[category].length - 1
       );
 
-      // Generate 1-3 random stats for this part
-      const numStats = Math.floor(Math.random() * 3) + 1;
-      const stats: PartStat[] = [];
+      // Generate stats using the new configuration-based method
+      const stats = generateStatsForPart(category);
 
-      // Define possible stats per category
-      const possibleStats: Record<PartCategory, StatName[]> = {
-        barrel: ["damage", "range", "recoil", "spread"],
-        slide: ["fireRate", "recoil", "spread"],
-        frame: ["recoil", "fireRate", "damage"],
-        trigger: ["fireRate", "spread", "reloadTime"],
-        magazine: ["magazineSize", "reloadTime"],
-        internal: ["damage", "spread", "fireRate", "recoil"],
-      };
+      // Calculate price based on the value of the stats
+      const totalPositiveValue = stats.reduce((sum, stat) => {
+        return sum + (stat.value > 0 ? Math.abs(stat.value) : 0);
+      }, 0);
 
-      // Choose random stats from possible stats for this category
-      const categoryStats = [...possibleStats[category]];
-      for (let j = 0; j < numStats && categoryStats.length > 0; j++) {
-        const statIndex = Math.floor(Math.random() * categoryStats.length);
-        const statName = categoryStats[statIndex];
-
-        // Remove this stat so we don't pick it again
-        categoryStats.splice(statIndex, 1);
-
-        // Random value between -5 and 10, weighted more toward positive
-        let value = Math.floor(Math.random() * 16) - 5;
-
-        // Adjust value ranges based on stat type
-        if (statName === "magazineSize") {
-          value = Math.max(1, Math.floor(value / 2)); // -2 to +5
-        } else if (statName === "reloadTime") {
-          value = Math.max(-0.5, Math.min(0.5, value / 10)); // -0.5 to +0.5 seconds
-        } else if (statName === "fireRate") {
-          value = Math.max(-0.15, Math.min(0.15, value / 100)); // -0.15 to +0.15 seconds
-        } else if (statName === "spread") {
-          value = value / 2; // -2.5 to +5
-        } else if (statName === "damage") {
-          value = value / 2; // -2.5 to +5
-        }
-
-        stats.push({ name: statName, value });
-      }
+      // Price is related to the total positive value with some randomness
+      const basePrice = Math.round(totalPositiveValue * 50);
+      const price = basePrice + Math.floor(Math.random() * (basePrice / 2));
 
       randomParts.push({
         id: `${prefix.toLowerCase()}-${category}`,
@@ -334,9 +463,9 @@ const generateRandomParts = (): GunPart[] => {
         image: "/gun-parts/internal-standard.png",
         stats,
         description: partDescriptions[category][descIndex],
-        unlocked: true, // Always unlocked now
-        cost: 0, // Cost is 0
-        price: 0, // Price is 0
+        unlocked: Math.random() > 0.4, // 60% chance to be unlocked
+        cost: price, // Cost is the same as price
+        price: price, // Set the price
       });
     }
   });
