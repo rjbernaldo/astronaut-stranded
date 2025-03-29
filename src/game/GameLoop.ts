@@ -466,7 +466,11 @@ export class GameLoop {
       }
 
       // Create and add enemy
-      const enemy = new Enemy({ x: spawnX, y: spawnY }, stats);
+      const enemy = new Enemy(
+        { x: spawnX, y: spawnY },
+        stats,
+        this.player.position
+      );
       this.enemies.push(enemy);
     }
   }
