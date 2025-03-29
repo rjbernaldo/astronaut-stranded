@@ -1617,36 +1617,10 @@ const GunCustomization: React.FC<GunCustomizationProps> = ({
     <div className="gun-customization">
       <h1>Gun Customization</h1>
 
-      {renderGunVisual()}
+      <div className="top-section">
+        {renderGunVisual()}
 
-      <div className="customization-container">
-        <div className="all-upgrades">
-          <h3>Available Upgrades</h3>
-          <div className="upgrade-items">
-            {getAllAvailableParts().map((part) => (
-              <div
-                key={part.id}
-                className="part-item"
-                onClick={() => equipPart(part.id)}
-                onMouseEnter={() => setHoveredPart(part.id)}
-                onMouseLeave={() => setHoveredPart(null)}
-              >
-                <div className="part-name">{part.name}</div>
-                <div className="part-category">
-                  {part.category.charAt(0).toUpperCase() +
-                    part.category.slice(1)}{" "}
-                  Part
-                </div>
-                <div className="part-description">{part.description}</div>
-                <div className="part-stats">
-                  {getStatChanges(part).map(renderStatChange)}
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        <div className="stats-panel">
+        <div className="weapon-stats">
           <h3>Weapon Statistics</h3>
           {hoveredPart && (
             <div className="preview-info">
@@ -1687,6 +1661,31 @@ const GunCustomization: React.FC<GunCustomizationProps> = ({
               20
             )}
           </div>
+        </div>
+      </div>
+
+      <div className="upgrades-section">
+        <h3>Available Upgrades</h3>
+        <div className="upgrade-items">
+          {getAllAvailableParts().map((part) => (
+            <div
+              key={part.id}
+              className="part-item"
+              onClick={() => equipPart(part.id)}
+              onMouseEnter={() => setHoveredPart(part.id)}
+              onMouseLeave={() => setHoveredPart(null)}
+            >
+              <div className="part-name">{part.name}</div>
+              <div className="part-category">
+                {part.category.charAt(0).toUpperCase() + part.category.slice(1)}{" "}
+                Part
+              </div>
+              <div className="part-description">{part.description}</div>
+              <div className="part-stats">
+                {getStatChanges(part).map(renderStatChange)}
+              </div>
+            </div>
+          ))}
         </div>
       </div>
 
