@@ -1591,14 +1591,14 @@ const GunCustomization: React.FC<GunCustomizationProps> = ({
 
         <div className="weapon-stats">
           <h3>Weapon Statistics</h3>
-          {/* {hoveredPart && (
+          {hoveredPart && (
             <div className="preview-info">
               <span>Previewing changes for: </span>
               <span className="preview-part-name">
                 {gunParts.find((p) => p.id === hoveredPart)?.name}
               </span>
             </div>
-          )} */}
+          )}
 
           <div className="stat-bars">
             {renderStatBar("Damage", gunStats.damage, previewStats?.damage)}

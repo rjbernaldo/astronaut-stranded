@@ -58,11 +58,9 @@
 }
 
 .preview-info {
-  background-color: #303030;
-  padding: 8px;
-  border-radius: 4px;
-  margin-bottom: 15px;
-  font-size: 14px;
+  margin-bottom: 10px;
+  font-size: 13px;
+  color: #aaa;
 }
 
 .preview-part-name {
@@ -74,35 +72,30 @@
 .stat-bars {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
+  margin-top: 10px;
 }
 
 .stat-line {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 8px 10px;
-  border-radius: 4px;
-  background-color: #2a2a2a;
-  border-left: 3px solid #555;
+  padding: 3px 0;
 }
 
 .stat-label {
-  font-size: 15px;
+  font-size: 14px;
   color: #c0c0c0;
-  font-weight: 500;
 }
 
 .stat-value {
-  font-size: 18px;
-  font-weight: bold;
+  font-size: 16px;
   color: #e0e0e0;
 }
 
 .stat-change {
   margin-left: 5px;
-  font-size: 14px;
-  opacity: 0.9;
+  font-size: 13px;
 }
 
 .positive {
