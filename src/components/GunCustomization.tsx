@@ -1483,51 +1483,20 @@ const GunCustomization: React.FC<GunCustomizationProps> = ({
     const previewInteger =
       previewValue !== null ? Math.floor(previewValue) : currentInteger;
 
-    const displayValue = previewInteger;
-    const barWidth = `${Math.min(
-      ((previewValue !== null ? previewValue : currentValue) / maxValue) * 100,
-      100
-    )}%`;
-
     // Calculate percentage change if there's a change
     const percentageChange = hasChange
       ? Math.round(((previewInteger - currentInteger) / currentInteger) * 100)
       : 0;
 
     return (
-      <div className="stat-bar">
+      <div className="stat-line">
         <span className="stat-label">{label}</span>
-        <div className="bar-container">
-          {hasChange && (
-            <>
-              <div
-                className="bar current"
-                style={{
-                  width: `${Math.min((currentValue / maxValue) * 100, 100)}%`,
-                }}
-              ></div>
-              <div
-                className={`bar preview ${
-                  isPositive ? "preview-positive" : "preview-negative"
-                }`}
-                style={{
-                  width: barWidth,
-                  opacity: 0.9,
-                  zIndex: 2,
-                }}
-              ></div>
-            </>
-          )}
-          {!hasChange && (
-            <div className="bar" style={{ width: barWidth }}></div>
-          )}
-        </div>
         <span
           className={`stat-value ${isPositive ? "positive" : ""} ${
             isNegative ? "negative" : ""
           }`}
         >
-          {displayValue}
+          {previewInteger}
           {hasChange && (
             <span className="stat-change">
               {isPositive ? " +" : " "}
@@ -1622,14 +1591,14 @@ const GunCustomization: React.FC<GunCustomizationProps> = ({
 
         <div className="weapon-stats">
           <h3>Weapon Statistics</h3>
-          {hoveredPart && (
+          {/* {hoveredPart && (
             <div className="preview-info">
               <span>Previewing changes for: </span>
               <span className="preview-part-name">
                 {gunParts.find((p) => p.id === hoveredPart)?.name}
               </span>
             </div>
-          )}
+          )} */}
 
           <div className="stat-bars">
             {renderStatBar("Damage", gunStats.damage, previewStats?.damage)}
