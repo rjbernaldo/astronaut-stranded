@@ -705,13 +705,12 @@ export class GameLoop {
     if (this.player.activeWeapon) {
       const weaponName = this.player.activeWeapon.stats.name;
       const currentAmmo = this.player.ammo.get(weaponName) || 0;
-      const reserveAmmo = this.player.reserves.get(weaponName) || 0;
 
       this.ctx.fillStyle = "#FFFFFF";
       this.ctx.font = "24px monospace";
       this.ctx.textAlign = "right";
       this.ctx.fillText(
-        `${currentAmmo} / ${reserveAmmo}`,
+        `${currentAmmo} / ∞`, // ∞ symbol indicates unlimited ammo
         this.canvas.width - padding,
         this.canvas.height - padding
       );

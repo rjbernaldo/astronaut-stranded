@@ -475,12 +475,11 @@ export class GameLoopState {
       const weaponName = state.player.activeWeapon.stats.name;
       const currentAmmo = state.player.ammo.get(weaponName) || 0;
 
-      // Display infinity symbol (∞) instead of reserve count to indicate unlimited reserves
       ctx.fillStyle = "#FFFFFF";
       ctx.font = "24px monospace";
       ctx.textAlign = "right";
       ctx.fillText(
-        `${currentAmmo} / ∞`,
+        `${currentAmmo} / ∞`, // ∞ symbol indicates unlimited ammo
         canvas.width - padding,
         canvas.height - padding
       );

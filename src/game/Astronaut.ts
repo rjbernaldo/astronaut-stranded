@@ -36,44 +36,66 @@ export class Astronaut {
         name: "pistol",
         damage: 10,
         magazineSize: 7,
-        reserveAmmo: 21,
+        reserveAmmo: Infinity, // Unlimited ammo reserves
         fireRate: 0.5,
         reloadTime: 2,
         recoil: 5,
         projectileCount: 1,
         spread: 0,
+        accuracy: 95,
+        range: 500,
+        projectileSpeed: 10,
+        projectileSize: 3,
+        knockback: 2,
+        ammoCapacity: 7,
       });
 
       this.addWeapon("rifle", {
         name: "rifle",
         damage: 15,
         magazineSize: 30,
-        reserveAmmo: 90,
+        reserveAmmo: Infinity, // Unlimited ammo reserves
         fireRate: 0.1,
         reloadTime: 3,
         recoil: 3,
         projectileCount: 1,
         spread: 3,
+        accuracy: 85,
+        range: 700,
+        projectileSpeed: 15,
+        projectileSize: 2,
+        knockback: 1,
+        ammoCapacity: 30,
       });
 
       this.addWeapon("shotgun", {
         name: "shotgun",
         damage: 8,
         magazineSize: 6,
-        reserveAmmo: 18,
+        reserveAmmo: Infinity, // Unlimited ammo reserves
         fireRate: 1,
         reloadTime: 0.8,
         recoil: 10,
         projectileCount: 5,
         spread: 15,
+        accuracy: 70,
+        range: 300,
+        projectileSpeed: 8,
+        projectileSize: 4,
+        knockback: 5,
+        ammoCapacity: 6,
       });
 
       // Set pistol as active weapon
       this.switchWeapon("pistol");
     } else {
-      // Initialize with custom weapon
-      this.addWeapon(initialWeaponStats.name, initialWeaponStats);
-      this.switchWeapon(initialWeaponStats.name);
+      // Initialize with custom weapon and set unlimited reserves
+      const modifiedStats = {
+        ...initialWeaponStats,
+        reserveAmmo: Infinity, // Ensure unlimited ammo for custom weapons too
+      };
+      this.addWeapon(modifiedStats.name, modifiedStats);
+      this.switchWeapon(modifiedStats.name);
     }
   }
 
@@ -140,12 +162,9 @@ export class Astronaut {
 
     const weaponName = this.activeWeapon.stats.name;
     const currentAmmo = this.ammo.get(weaponName) || 0;
-    const currentReserves = this.reserves.get(weaponName) || 0;
 
-    if (
-      currentAmmo === this.activeWeapon.stats.magazineSize ||
-      currentReserves <= 0
-    ) {
+    // Only check if the magazine is already full
+    if (currentAmmo === this.activeWeapon.stats.magazineSize) {
       return false;
     }
 
@@ -153,11 +172,8 @@ export class Astronaut {
 
     // Start reload (will be completed after reload time)
     setTimeout(() => {
-      const ammoNeeded = this.activeWeapon!.stats.magazineSize - currentAmmo;
-      const ammoToAdd = Math.min(ammoNeeded, currentReserves);
-
-      this.ammo.set(weaponName, currentAmmo + ammoToAdd);
-      this.reserves.set(weaponName, currentReserves - ammoToAdd);
+      // Always fill the magazine completely - unlimited ammo reserves
+      this.ammo.set(weaponName, this.activeWeapon!.stats.magazineSize);
       this.reloading = false;
     }, this.activeWeapon.stats.reloadTime * 1000);
 

@@ -29,6 +29,11 @@ export interface WeaponStats {
   knockback: number;
   ammoCapacity: number;
   reloadTime: number;
+  magazineSize: number;
+  reserveAmmo: number;
+  projectileCount: number;
+  spread: number;
+  recoil: number;
   // Add more properties as needed
 }
 
