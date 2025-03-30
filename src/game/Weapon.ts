@@ -34,7 +34,7 @@ export class Weapon {
           position: { x: position.x, y: position.y },
           velocity,
           damage: this.stats.damage,
-          range: 500,
+          range: this.stats.range || 500,
           speed: 10,
         })
       );

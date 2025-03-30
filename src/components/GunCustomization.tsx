@@ -1564,27 +1564,26 @@ export const GunCustomization: React.FC<GunCustomizationProps> = ({
     // Ensure no negative values
     damage = Math.max(1, damage);
     fireRate = Math.max(0.1, fireRate);
-    magazineSize = Math.max(1, magazineSize);
+    magazineSize = Math.max(1, Math.floor(magazineSize));
     reloadTime = Math.max(0.5, reloadTime);
     recoil = Math.max(1, recoil);
-    projectileCount = Math.max(1, projectileCount);
+    projectileCount = Math.max(1, Math.floor(projectileCount));
     spread = Math.max(0, spread);
     range = Math.max(100, range);
 
-    // Return the final weapon stats
     return {
-      name: "custom pistol",
+      name: "pistol", // Important to use 'pistol' as the name so it's recognized in the game
       damage,
-      magazineSize,
-      reserveAmmo: magazineSize * 3,
       fireRate,
+      magazineSize,
       reloadTime,
       recoil,
       projectileCount,
       spread,
-      customized: true,
       range,
-      parts: { ...equippedParts },
+      reserveAmmo: magazineSize * 3, // Typical reserve ammo is 3x the magazine size
+      customized: true,
+      parts: equippedParts as Required<Record<PartCategory, string>>,
     };
   };
 
