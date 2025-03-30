@@ -45,6 +45,7 @@ export class GameLoop {
 
   private animationFrameId: number | null = null;
   private isPaused: boolean = false;
+  private autoAimEnabled: boolean = true; // Auto-aim enabled by default
 
   constructor(
     canvas: HTMLCanvasElement,
@@ -79,6 +80,11 @@ export class GameLoop {
       // Reload on 'r' press
       if (e.key.toLowerCase() === "r") {
         this.player.reload();
+      }
+
+      // Toggle auto-aim with 't' key
+      if (e.key.toLowerCase() === "t") {
+        this.autoAimEnabled = !this.autoAimEnabled;
       }
 
       // Weapon switching
@@ -210,6 +216,9 @@ export class GameLoop {
     // Handle player input
     this.handleInput(deltaTime, timestamp);
 
+    // Auto-aim and shoot at nearby enemies
+    this.handleAutoAimAndShoot(timestamp);
+
     // Update player
     this.player.update(deltaTime, timestamp);
 
@@ -270,13 +279,14 @@ export class GameLoop {
       this.movePlayer("right", deltaTime);
     }
 
-    // Shooting
+    // Manual shooting - only override auto-aim if mouseDown is true
     if (this.mouseDown) {
+      // Manual aim toward mouse
+      this.aim();
+
+      // Manual shooting
       this.shoot(timestamp);
     }
-
-    // Rotation (aim toward mouse)
-    this.aim();
   }
 
   private movePlayer(
@@ -738,6 +748,16 @@ export class GameLoop {
       150,
       150
     );
+
+    // Display auto-aim status
+    this.ctx.fillStyle = "#FFFFFF";
+    this.ctx.font = "16px monospace";
+    this.ctx.textAlign = "left";
+    this.ctx.fillText(
+      `Auto-aim: ${this.autoAimEnabled ? "ON" : "OFF"} (T to toggle)`,
+      20,
+      this.canvas.height - 20
+    );
   }
 
   private renderMiniMap(
@@ -954,6 +974,60 @@ export class GameLoop {
       if (this.gameState.difficultyLevel % 3 === 0) {
         this.enemySpawnInterval = Math.max(0.5, this.enemySpawnInterval * 0.9);
         this.enemySpawnCount += 1;
+      }
+    }
+  }
+
+  // Auto-aim at the closest enemy within range and shoot if possible
+  private handleAutoAimAndShoot(timestamp: number): void {
+    // Skip if auto-aim is disabled
+    if (!this.autoAimEnabled) return;
+
+    if (!this.player.activeWeapon || this.enemies.length === 0) return;
+
+    // Get the weapon's range
+    const weaponRange = this.player.activeWeapon.stats.range || 500;
+
+    // Find the closest enemy within range
+    let closestEnemy: Enemy | null = null;
+    let closestDistance = weaponRange;
+
+    for (const enemy of this.enemies) {
+      if (!enemy.active) continue;
+
+      const dx = enemy.position.x - this.player.position.x;
+      const dy = enemy.position.y - this.player.position.y;
+      const distance = Math.sqrt(dx * dx + dy * dy);
+
+      if (distance < closestDistance) {
+        closestDistance = distance;
+        closestEnemy = enemy;
+      }
+    }
+
+    // If we found an enemy within range, aim and shoot at it
+    if (closestEnemy) {
+      // Calculate direction from player to enemy
+      const dx = closestEnemy.position.x - this.player.position.x;
+      const dy = closestEnemy.position.y - this.player.position.y;
+
+      // Calculate angle in radians, then convert to degrees
+      const angle = Math.atan2(dy, dx) * (180 / Math.PI);
+
+      // Set player rotation to aim at the enemy
+      this.player.setRotation(angle);
+
+      // Try to shoot
+      const didShoot = this.player.shoot(timestamp);
+
+      // If we didn't shoot and the weapon is out of ammo, reload
+      if (!didShoot) {
+        const weaponName = this.player.activeWeapon.stats.name;
+        const currentAmmo = this.player.ammo.get(weaponName) || 0;
+
+        if (currentAmmo <= 0 && !this.player.reloading) {
+          this.player.reload();
+        }
       }
     }
   }
