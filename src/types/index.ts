@@ -21,43 +21,78 @@ export interface ProjectileOptions {
 export interface WeaponStats {
   name: string;
   damage: number;
-  magazineSize: number;
-  reserveAmmo: number;
-  fireRate: number; // Seconds between shots
-  reloadTime: number; // Seconds to reload
-  recoil: number; // Amount of recoil
-  projectileCount: number; // Number of projectiles per shot (e.g. shotgun)
-  spread: number; // Spread angle in degrees
-  // New fields for customization
-  customized?: boolean;
-  range?: number; // Affects projectile distance
-  parts?: {
-    barrel: string;
-    slide: string;
-    frame: string;
-    trigger: string;
-    magazine: string;
-    internal: string;
-  };
+  fireRate: number;
+  accuracy: number;
+  range: number;
+  projectileSpeed: number;
+  projectileSize: number;
+  knockback: number;
+  ammoCapacity: number;
+  reloadTime: number;
+  // Add more properties as needed
 }
 
 export type EnemyType = "Scout" | "Brute" | "Spitter";
 
 export interface EnemyStats {
-  type: EnemyType;
   health: number;
   speed: number;
+  damage: number;
   attackRange: number;
-  attackDamage: number;
-  attackSpeed: number; // in seconds
-  level: number; // Added level for difficulty scaling
+  attackSpeed: number;
+  scoreValue: number;
+  // Add more properties as needed
 }
 
 export interface GameState {
+  // Player state
+  player: any; // Will be the Astronaut instance
+
+  // Camera position
+  cameraPosition: Position;
+
+  // Entities
+  enemies: any[]; // Will be Enemy instances
+  projectiles: any[]; // Will be Projectile instances
+
+  // Map
+  map: any; // Will be GameMap instance
+
+  // Input state
+  keysPressed: Set<string>;
+  mousePosition: Position;
+  mouseDown: boolean;
+
+  // Game state
+  isPaused: boolean;
+
+  // Auto-aim
+  autoAimEnabled: boolean;
+
+  // Weapon stats
+  currentWeaponStats: WeaponStats | null;
+
+  // UI state
+  ui: {
+    score: number;
+    waveNumber: number;
+    difficultyLevel: number;
+    gameTime: number;
+    nextLevelTime: number;
+    isGameOver: boolean;
+  };
+
+  // Enemy spawning
+  lastEnemySpawnTime: number;
+  enemySpawnInterval: number;
+  enemySpawnCount: number;
+}
+
+export interface UIState {
   score: number;
-  isGameOver: boolean;
   waveNumber: number;
-  difficultyLevel: number; // Added to track current difficulty level
-  gameTime: number; // Track elapsed game time in seconds
-  nextLevelTime: number; // Time until the next difficulty level increase
+  difficultyLevel: number;
+  gameTime: number;
+  nextLevelTime: number;
+  isGameOver: boolean;
 }
