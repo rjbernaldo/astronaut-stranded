@@ -144,6 +144,9 @@ export class CentralGameState {
     const startY = Math.floor(map.height / 2) * map.tileSize;
     const player = new Astronaut({ x: startX, y: startY }, initialWeaponStats);
 
+    // Ensure unlimited ammo reserves for all weapons
+    this.ensureUnlimitedAmmoReserves(player);
+
     // Initial state
     this.state = {
       player,
@@ -170,6 +173,16 @@ export class CentralGameState {
       keysPressed: new Set<string>(),
       currentWeaponStats: initialWeaponStats || null,
     };
+  }
+
+  /**
+   * Helper method to ensure all weapons have unlimited ammo reserves
+   */
+  private ensureUnlimitedAmmoReserves(player: Astronaut): void {
+    // Set unlimited reserves for all weapons
+    ["pistol", "rifle", "shotgun"].forEach((weapon) => {
+      player.reserves.set(weapon, 999999);
+    });
   }
 
   // Getters
@@ -375,6 +388,19 @@ export class CentralGameState {
 
     if (!state.player.activeWeapon) return state;
 
+    // Check if weapon is empty and needs to be reloaded
+    const weaponName = state.player.activeWeapon.stats.name;
+    const currentAmmo = state.player.ammo.get(weaponName) || 0;
+
+    // If no ammo, ensure we have reserves and reload
+    if (currentAmmo <= 0) {
+      // Set a large number for reserves to simulate unlimited ammo
+      state.player.reserves.set(weaponName, 999999);
+      state.player.reload();
+      // Return state since we can't shoot while reloading
+      return state;
+    }
+
     const didShoot = state.player.shoot(timestamp);
 
     if (didShoot) {
@@ -398,6 +424,14 @@ export class CentralGameState {
     state: GameStateData,
     action: ReloadAction
   ): GameStateData {
+    // Ensure player has unlimited reserve ammo for all weapons
+    if (state.player.activeWeapon) {
+      const weaponName = state.player.activeWeapon.stats.name;
+      // Set a large number for reserves to simulate unlimited ammo
+      state.player.reserves.set(weaponName, 999999);
+    }
+
+    // Now call reload which will use the reserves
     state.player.reload();
     return state;
   }
@@ -604,6 +638,17 @@ export class CentralGameState {
 
       // Set player rotation to aim at the enemy
       state.player.setRotation(angle);
+
+      // Check if we need to reload
+      const weaponName = state.player.activeWeapon.stats.name;
+      const currentAmmo = state.player.ammo.get(weaponName) || 0;
+
+      if (currentAmmo <= 0) {
+        // Ensure unlimited reserves
+        state.player.reserves.set(weaponName, 999999);
+        state.player.reload();
+        return state;
+      }
 
       // Use the shoot action
       return this.handleShoot(state, {
