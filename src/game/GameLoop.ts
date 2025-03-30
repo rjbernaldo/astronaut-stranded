@@ -44,6 +44,7 @@ export class GameLoop {
   };
 
   private animationFrameId: number | null = null;
+  private isPaused: boolean = false;
 
   constructor(
     canvas: HTMLCanvasElement,
@@ -128,6 +129,7 @@ export class GameLoop {
     this.handleResize();
 
     // Start game loop
+    this.isPaused = false;
     this.animationFrameId = requestAnimationFrame(this.loop.bind(this));
   }
 
@@ -146,7 +148,36 @@ export class GameLoop {
     window.removeEventListener("resize", () => {});
   }
 
+  pause(): void {
+    if (!this.isPaused && this.animationFrameId) {
+      this.isPaused = true;
+      cancelAnimationFrame(this.animationFrameId);
+      this.animationFrameId = null;
+
+      // Render a paused indicator
+      this.renderPausedOverlay();
+    }
+  }
+
+  resume(): void {
+    if (this.isPaused) {
+      this.isPaused = false;
+      this.lastTime = performance.now();
+      this.animationFrameId = requestAnimationFrame(this.loop.bind(this));
+    }
+  }
+
+  updateWeapon(weaponStats: WeaponStats): void {
+    // Update the player's weapon with the new stats
+    if (this.player) {
+      this.player.updateWeapon(weaponStats);
+    }
+  }
+
   private loop(timestamp: number): void {
+    // Stop the loop if game is paused
+    if (this.isPaused) return;
+
     // Calculate delta time
     const deltaTime = (timestamp - this.lastTime) / 1000; // seconds
     this.lastTime = timestamp;
@@ -882,6 +913,22 @@ export class GameLoop {
     // Restart prompt
     this.ctx.font = "16px monospace";
     this.ctx.fillText("Refresh the page to play again", centerX, centerY + 150);
+  }
+
+  private renderPausedOverlay(): void {
+    const centerX = this.canvas.width / 2;
+    const centerY = this.canvas.height / 2;
+
+    // Semi-transparent overlay
+    this.ctx.fillStyle = "rgba(0, 0, 0, 0.5)";
+    this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+
+    // Paused text
+    this.ctx.fillStyle = "#FFFFFF";
+    this.ctx.font = "32px monospace";
+    this.ctx.textAlign = "center";
+    this.ctx.textBaseline = "middle";
+    this.ctx.fillText("GAME PAUSED", centerX, centerY);
   }
 
   private updateGameState(deltaTime: number): void {

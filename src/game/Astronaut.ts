@@ -171,4 +171,14 @@ export class Astronaut {
   update(deltaTime: number, timestamp: number): void {
     // Empty update - removed flashlight functionality
   }
+
+  updateWeapon(stats: WeaponStats): void {
+    // Replace the existing weapon with the new stats
+    if (stats.name && this.weapons.has(stats.name)) {
+      // Create a new weapon with updated stats
+      this.addWeapon(stats.name, stats);
+      // Make sure it's the active weapon
+      this.switchWeapon(stats.name);
+    }
+  }
 }
