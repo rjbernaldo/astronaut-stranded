@@ -1017,11 +1017,11 @@ export class GameLoop {
       // Set player rotation to aim at the enemy
       this.player.setRotation(angle);
 
-      // Try to shoot
-      const didShoot = this.player.shoot(timestamp);
+      // Use the same shooting method as manual shooting to ensure projectiles are created
+      this.shoot(timestamp);
 
-      // If we didn't shoot and the weapon is out of ammo, reload
-      if (!didShoot) {
+      // Check if we need to reload
+      if (this.player.activeWeapon) {
         const weaponName = this.player.activeWeapon.stats.name;
         const currentAmmo = this.player.ammo.get(weaponName) || 0;
 
