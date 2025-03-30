@@ -162,8 +162,15 @@ export class GameLoop {
   resume(): void {
     if (this.isPaused) {
       this.isPaused = false;
+      // Reset the lastTime to the current time to prevent a large time delta
+      // that would cause the game to "jump" forward
       this.lastTime = performance.now();
+
+      // Resume the animation loop without restarting the game
       this.animationFrameId = requestAnimationFrame(this.loop.bind(this));
+
+      // Redraw the current state immediately to remove pause overlay
+      this.render();
     }
   }
 

@@ -25,6 +25,7 @@ const GameCanvas = forwardRef<GameCanvasRef, GameCanvasProps>(
   ({ width = 800, height = 600, initialWeaponStats, onLoaded }, ref) => {
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const gameLoopRef = useRef<GameLoop | null>(null);
+    const initializedRef = useRef(false);
 
     // Expose methods via the ref
     useImperativeHandle(ref, () => ({
@@ -45,9 +46,10 @@ const GameCanvas = forwardRef<GameCanvasRef, GameCanvasProps>(
       },
     }));
 
+    // Initialize the game loop only once
     useEffect(() => {
       const canvas = canvasRef.current;
-      if (!canvas) return;
+      if (!canvas || initializedRef.current) return;
 
       canvas.width = width;
       canvas.height = height;
@@ -56,6 +58,7 @@ const GameCanvas = forwardRef<GameCanvasRef, GameCanvasProps>(
       const gameLoop = new GameLoop(canvas, seed, initialWeaponStats);
       gameLoopRef.current = gameLoop;
       gameLoop.start();
+      initializedRef.current = true;
 
       // Notify parent component that the game has loaded
       if (onLoaded) {
@@ -65,8 +68,25 @@ const GameCanvas = forwardRef<GameCanvasRef, GameCanvasProps>(
       return () => {
         gameLoop.stop();
         gameLoopRef.current = null;
+        initializedRef.current = false;
       };
-    }, [width, height, initialWeaponStats, onLoaded]);
+    }, []); // Empty dependency array - only run on mount/unmount
+
+    // Handle canvas size updates separately
+    useEffect(() => {
+      const canvas = canvasRef.current;
+      if (!canvas || !gameLoopRef.current) return;
+
+      canvas.width = width;
+      canvas.height = height;
+    }, [width, height]);
+
+    // Handle weapon stats updates separately
+    useEffect(() => {
+      if (gameLoopRef.current && initialWeaponStats && initializedRef.current) {
+        gameLoopRef.current.updateWeapon(initialWeaponStats);
+      }
+    }, [initialWeaponStats]);
 
     return (
       <canvas

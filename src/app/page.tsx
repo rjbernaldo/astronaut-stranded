@@ -45,12 +45,28 @@ export default function Home() {
   useEffect(() => {
     if (gameCanvasRef.current && gameLoaded) {
       if (showGunCustomization) {
+        // Pause the game when customization modal opens
         gameCanvasRef.current.pause();
       } else {
-        gameCanvasRef.current.resume();
+        // Only resume if the game was previously started
+        if (gameStarted) {
+          gameCanvasRef.current.resume();
+        }
       }
     }
-  }, [showGunCustomization, gameLoaded]);
+  }, [showGunCustomization, gameLoaded, gameStarted]);
+
+  // When game changes to started state, make sure to resume if paused
+  useEffect(() => {
+    if (
+      gameStarted &&
+      gameCanvasRef.current &&
+      gameLoaded &&
+      !showGunCustomization
+    ) {
+      gameCanvasRef.current.resume();
+    }
+  }, [gameStarted, gameLoaded, showGunCustomization]);
 
   const handleStartGame = () => {
     setGameStarted(true);
