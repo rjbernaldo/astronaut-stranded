@@ -534,22 +534,57 @@ export class GameLoopState {
         }
 
         if (isEjecting) {
-          // Animation: bullet moves down and fades out
-          const animYOffset = 30 * ejectionProgress;
-          const fadeOpacity = 1 - ejectionProgress;
+          // Get the ejected bullet
+          const ejectedBullet = ejectedBullets.find(
+            (b) => b.weaponName === weaponName
+          );
+          if (!ejectedBullet) continue;
 
-          // Draw ejected bullet with animation
+          // Animation parameters
+          const progress = ejectedBullet.progress;
+          const rotation = ejectedBullet.rotation;
+          const initialVelocity = ejectedBullet.initialVelocity;
+
+          // Calculate arc trajectory
+          // Initial upward movement with gravity effect
+          const gravity = 8; // Gravity effect
+          const timeSquared = progress * progress;
+
+          // Calculate position based on initial velocity and gravity
+          const xOffset = initialVelocity.x * progress * 50; // Scale for visual effect
+          const yOffset =
+            (initialVelocity.y * progress - 0.5 * gravity * timeSquared) * 50; // Gravity formula
+
+          // Calculate opacity (fade out towards the end of animation)
+          const fadeOpacity = Math.max(0, 1 - progress * 1.5);
+
+          // Save context for rotation
+          ctx.save();
+
+          // Translate to bullet position with offset
+          ctx.translate(
+            bulletX + bulletWidth / 2 + xOffset,
+            bulletY + bulletHeight / 2 + yOffset
+          );
+
+          // Rotate the bullet
+          ctx.rotate((rotation * Math.PI) / 180);
+
+          // Draw ejected bullet with animation (centered at origin after translation)
           ctx.globalAlpha = fadeOpacity;
           ctx.fillStyle = "#FFD700";
           ctx.fillRect(
-            bulletX,
-            bulletY + animYOffset,
+            -bulletWidth / 2,
+            -bulletHeight / 2,
             bulletWidth,
             bulletHeight
           );
           ctx.fillStyle = "#FFAA00";
-          ctx.fillRect(bulletX, bulletY + animYOffset, bulletWidth, 6);
+          ctx.fillRect(-bulletWidth / 2, -bulletHeight / 2, bulletWidth, 6);
+
+          // Restore context
           ctx.globalAlpha = 1;
+          ctx.restore();
         }
 
         // Only draw the bullet in place if it's not being ejected or it's not the current bullet

@@ -6,6 +6,8 @@ interface EjectedBullet {
   timestamp: number;
   weaponName: string;
   progress: number; // 0 to 1 animation progress
+  rotation: number; // Current rotation angle in degrees
+  initialVelocity: { x: number; y: number }; // Initial velocity for arc trajectory
 }
 
 export class Astronaut {
@@ -160,11 +162,21 @@ export class Astronaut {
     this.ammo.set(weaponName, currentAmmo - 1);
     this.lastFireTime = timestamp;
 
-    // Add ejected bullet animation
+    // Add ejected bullet animation with random initial velocity
+    // This creates a slightly different arc each time
+    const randomAngle = this.rotation + 90 + (Math.random() * 30 - 15); // Eject perpendicular to gun with random variance
+    const radians = (randomAngle * Math.PI) / 180;
+    const speed = 2 + Math.random() * 1; // Random initial speed
+
     this.ejectedBullets.push({
       timestamp,
       weaponName,
       progress: 0,
+      rotation: Math.random() * 360, // Random initial rotation
+      initialVelocity: {
+        x: Math.cos(radians) * speed,
+        y: Math.sin(radians) * speed,
+      },
     });
 
     // Apply recoil
@@ -205,8 +217,11 @@ export class Astronaut {
     for (let i = this.ejectedBullets.length - 1; i >= 0; i--) {
       const bullet = this.ejectedBullets[i];
 
-      // Update animation progress (animations last 0.5 seconds)
-      bullet.progress += deltaTime / 0.5;
+      // Update animation progress (animations last 0.3 seconds - faster than before)
+      bullet.progress += deltaTime / 0.3;
+
+      // Update rotation (spin effect)
+      bullet.rotation += deltaTime * 720; // 720 degrees per second = 2 full rotations/second
 
       // Remove completed animations
       if (bullet.progress >= 1) {
