@@ -224,4 +224,33 @@ export class Enemy {
         return 20;
     }
   }
+
+  /**
+   * Returns the score value for this enemy based on type and level
+   * Higher level and tougher enemies give more points
+   */
+  getScoreValue(): number {
+    let baseScore = 0;
+
+    // Base score by enemy type
+    switch (this.type) {
+      case "Scout":
+        baseScore = 10; // Basic enemies
+        break;
+      case "Brute":
+        baseScore = 25; // Tougher, high-damage enemies
+        break;
+      case "Spitter":
+        baseScore = 20; // Special ranged enemies
+        break;
+      default:
+        baseScore = 10;
+    }
+
+    // Multiply by level factor - higher levels give more points
+    // Level 1: 1x, Level 2: 1.5x, Level 3: 2x, etc.
+    const levelMultiplier = 1 + (this.level - 1) * 0.5;
+
+    return Math.round(baseScore * levelMultiplier);
+  }
 }

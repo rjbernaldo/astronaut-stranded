@@ -23,6 +23,7 @@ export class Astronaut {
   reloading: boolean;
   lastFireTime: number;
   ejectedBullets: EjectedBullet[]; // Track recently fired bullets for animation
+  reloadStartTime: number | null; // Track when reload started
 
   constructor(
     startPosition: Position,
@@ -40,6 +41,7 @@ export class Astronaut {
     this.reloading = false;
     this.lastFireTime = 0;
     this.ejectedBullets = []; // Initialize empty array for ejected bullets
+    this.reloadStartTime = null;
 
     // Initialize default weapons if no custom weapon provided
     if (!initialWeaponStats) {
@@ -197,12 +199,14 @@ export class Astronaut {
     }
 
     this.reloading = true;
+    this.reloadStartTime = performance.now();
 
     // Start reload (will be completed after reload time)
     setTimeout(() => {
       // Always fill the magazine completely - unlimited ammo reserves
       this.ammo.set(weaponName, this.activeWeapon!.stats.magazineSize);
       this.reloading = false;
+      this.reloadStartTime = null; // Reset reload start time
     }, this.activeWeapon.stats.reloadTime * 1000);
 
     return true;

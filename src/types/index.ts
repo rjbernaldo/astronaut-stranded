@@ -46,7 +46,17 @@ export interface EnemyStats {
   attackRange: number;
   attackSpeed: number;
   scoreValue: number;
+  type: EnemyType;
+  attackDamage: number;
+  level: number;
   // Add more properties as needed
+}
+
+export interface Notification {
+  message: string;
+  color: string;
+  startTime: number;
+  duration: number;
 }
 
 export interface GameState {
@@ -85,12 +95,18 @@ export interface GameState {
     gameTime: number;
     nextLevelTime: number;
     isGameOver: boolean;
+    playerLevel: number;
+    playerXp: number;
+    xpForNextLevel: number;
   };
 
   // Enemy spawning
   lastEnemySpawnTime: number;
   enemySpawnInterval: number;
   enemySpawnCount: number;
+
+  // Notifications
+  notifications: Notification[];
 }
 
 export interface UIState {
@@ -100,4 +116,7 @@ export interface UIState {
   gameTime: number;
   nextLevelTime: number;
   isGameOver: boolean;
+  playerLevel: number;
+  playerXp: number;
+  xpForNextLevel: number;
 }
