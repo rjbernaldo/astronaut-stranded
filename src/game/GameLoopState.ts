@@ -502,12 +502,48 @@ export class GameLoopState {
         startY - 15
       );
 
-      // Display infinity symbol for reserves
-      ctx.font = "20px monospace";
-      ctx.fillText("∞", canvas.width - padding, startY + bulletHeight + 30);
-
       // Get ejected bullets for animation
       const ejectedBullets = state.player.getEjectedBullets();
+
+      // Draw reload progress bar if reloading
+      if (state.player.reloading) {
+        // Get the reload start time and duration
+        const reloadTime = state.player.activeWeapon.stats.reloadTime * 1000; // Convert to ms
+        const currentTime = performance.now();
+        const reloadStartTime = state.player.reloadStartTime || currentTime;
+        const elapsedTime = currentTime - reloadStartTime;
+        const progress = Math.min(elapsedTime / reloadTime, 1);
+
+        // Draw reload bar background
+        const reloadBarHeight = 8;
+        const reloadBarY = startY + bulletHeight + 8;
+        const totalWidth =
+          maxAmmo * (bulletWidth + bulletSpacing) - bulletSpacing;
+
+        ctx.fillStyle = "#333333";
+        ctx.fillRect(
+          startX - totalWidth + bulletWidth,
+          reloadBarY,
+          totalWidth,
+          reloadBarHeight
+        );
+
+        // Draw progress
+        ctx.fillStyle = "#4CAF50"; // Green color
+        ctx.fillRect(
+          startX - totalWidth + bulletWidth,
+          reloadBarY,
+          totalWidth * progress,
+          reloadBarHeight
+        );
+
+        // Draw text "RELOADING" above the progress bar
+        ctx.fillStyle = "#FFFFFF";
+        ctx.font = "12px monospace";
+        ctx.textAlign = "center";
+        ctx.fillText("RELOADING", startX - totalWidth / 2, reloadBarY - 4);
+        ctx.textAlign = "right"; // Reset text alignment
+      }
 
       // Draw bullets
       for (let i = 0; i < maxAmmo; i++) {
