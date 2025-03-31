@@ -1,6 +1,13 @@
 import { Direction, Position, WeaponStats } from "../types";
 import { Weapon } from "./Weapon";
 
+// Interface for tracking ejected bullet animations
+interface EjectedBullet {
+  timestamp: number;
+  weaponName: string;
+  progress: number; // 0 to 1 animation progress
+}
+
 export class Astronaut {
   position: Position;
   health: number;
@@ -13,6 +20,7 @@ export class Astronaut {
   weapons: Map<string, Weapon>;
   reloading: boolean;
   lastFireTime: number;
+  ejectedBullets: EjectedBullet[]; // Track recently fired bullets for animation
 
   constructor(
     startPosition: Position,
@@ -29,6 +37,7 @@ export class Astronaut {
     this.weapons = new Map();
     this.reloading = false;
     this.lastFireTime = 0;
+    this.ejectedBullets = []; // Initialize empty array for ejected bullets
 
     // Initialize default weapons if no custom weapon provided
     if (!initialWeaponStats) {
@@ -151,6 +160,13 @@ export class Astronaut {
     this.ammo.set(weaponName, currentAmmo - 1);
     this.lastFireTime = timestamp;
 
+    // Add ejected bullet animation
+    this.ejectedBullets.push({
+      timestamp,
+      weaponName,
+      progress: 0,
+    });
+
     // Apply recoil
     this.rotation += (Math.random() * 2 - 1) * this.activeWeapon.stats.recoil;
 
@@ -185,7 +201,18 @@ export class Astronaut {
   }
 
   update(deltaTime: number, timestamp: number): void {
-    // Empty update - removed flashlight functionality
+    // Update ejected bullet animations
+    for (let i = this.ejectedBullets.length - 1; i >= 0; i--) {
+      const bullet = this.ejectedBullets[i];
+
+      // Update animation progress (animations last 0.5 seconds)
+      bullet.progress += deltaTime / 0.5;
+
+      // Remove completed animations
+      if (bullet.progress >= 1) {
+        this.ejectedBullets.splice(i, 1);
+      }
+    }
   }
 
   updateWeapon(stats: WeaponStats): void {
@@ -196,5 +223,10 @@ export class Astronaut {
       // Make sure it's the active weapon
       this.switchWeapon(stats.name);
     }
+  }
+
+  // Get ejected bullets for animation
+  getEjectedBullets(): EjectedBullet[] {
+    return this.ejectedBullets;
   }
 }

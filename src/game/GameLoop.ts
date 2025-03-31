@@ -705,23 +705,99 @@ export class GameLoop {
     if (this.player.activeWeapon) {
       const weaponName = this.player.activeWeapon.stats.name;
       const currentAmmo = this.player.ammo.get(weaponName) || 0;
+      const maxAmmo = this.player.activeWeapon.stats.magazineSize;
 
-      this.ctx.fillStyle = "#FFFFFF";
-      this.ctx.font = "24px monospace";
-      this.ctx.textAlign = "right";
-      this.ctx.fillText(
-        `${currentAmmo} / ∞`, // ∞ symbol indicates unlimited ammo
-        this.canvas.width - padding,
-        this.canvas.height - padding
+      // Position and dimensions for the ammo display
+      const bulletWidth = 10;
+      const bulletHeight = 24;
+      const bulletSpacing = 4;
+      const startX = this.canvas.width - padding - bulletWidth;
+      const startY = this.canvas.height - padding - 30;
+
+      // Background for ammo display
+      this.ctx.fillStyle = "rgba(0, 0, 0, 0.5)";
+      this.ctx.fillRect(
+        startX - maxAmmo * (bulletWidth + bulletSpacing) + bulletWidth,
+        startY - 5,
+        maxAmmo * (bulletWidth + bulletSpacing) + 10,
+        bulletHeight + 10
       );
 
-      // Show weapon name
+      // Display weapon name
+      this.ctx.fillStyle = "#FFFFFF";
       this.ctx.font = "16px monospace";
+      this.ctx.textAlign = "right";
       this.ctx.fillText(
         weaponName.toUpperCase(),
         this.canvas.width - padding,
-        this.canvas.height - padding - 30
+        startY - 15
       );
+
+      // Display infinity symbol for reserves
+      this.ctx.font = "20px monospace";
+      this.ctx.fillText(
+        "∞",
+        this.canvas.width - padding,
+        startY + bulletHeight + 30
+      );
+
+      // Get ejected bullets for animation
+      const ejectedBullets = this.player.getEjectedBullets();
+
+      // Draw bullets
+      for (let i = 0; i < maxAmmo; i++) {
+        // Determine if this bullet is loaded/active
+        const isActive = i < currentAmmo;
+
+        // Position for this bullet
+        const bulletX = startX - i * (bulletWidth + bulletSpacing);
+        const bulletY = startY;
+
+        // Check if this bullet is being ejected
+        let isEjecting = false;
+        let ejectionProgress = 0;
+
+        if (i === currentAmmo && ejectedBullets.length > 0) {
+          // Find the most recent ejected bullet for this weapon
+          const ejectedBullet = ejectedBullets.find(
+            (b) => b.weaponName === weaponName
+          );
+          if (ejectedBullet) {
+            isEjecting = true;
+            ejectionProgress = ejectedBullet.progress;
+          }
+        }
+
+        if (isEjecting) {
+          // Animation: bullet moves down and fades out
+          const animYOffset = 30 * ejectionProgress;
+          const fadeOpacity = 1 - ejectionProgress;
+
+          // Draw ejected bullet with animation
+          this.ctx.globalAlpha = fadeOpacity;
+          this.ctx.fillStyle = "#FFD700";
+          this.ctx.fillRect(
+            bulletX,
+            bulletY + animYOffset,
+            bulletWidth,
+            bulletHeight
+          );
+          this.ctx.fillStyle = "#FFAA00";
+          this.ctx.fillRect(bulletX, bulletY + animYOffset, bulletWidth, 6);
+          this.ctx.globalAlpha = 1;
+        }
+
+        // Only draw the bullet in place if it's not being ejected or it's not the current bullet
+        if (!isEjecting || i !== currentAmmo) {
+          // Draw bullet casing
+          this.ctx.fillStyle = isActive ? "#FFD700" : "#555555"; // Gold for active, gray for spent
+          this.ctx.fillRect(bulletX, bulletY, bulletWidth, bulletHeight);
+
+          // Draw bullet tip
+          this.ctx.fillStyle = isActive ? "#FFAA00" : "#333333";
+          this.ctx.fillRect(bulletX, bulletY, bulletWidth, 6);
+        }
+      }
     }
 
     // Draw score and wave
