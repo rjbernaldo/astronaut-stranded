@@ -18,6 +18,7 @@ export default function Home() {
   const [gameStarted, setGameStarted] = useState(false);
   const [showGunCustomization, setShowGunCustomization] = useState(false);
   const [gameLoaded, setGameLoaded] = useState(false);
+  const [isLevelUpCustomization, setIsLevelUpCustomization] = useState(false);
   const gameCanvasRef = useRef<GameCanvasRef>(null);
   const [weaponStats, setWeaponStats] = useState<WeaponStats>({
     name: "pistol",
@@ -68,8 +69,20 @@ export default function Home() {
     }
   }, [gameStarted, gameLoaded, showGunCustomization]);
 
+  // Set the level up callback after game is loaded
+  useEffect(() => {
+    if (gameCanvasRef.current && gameLoaded) {
+      gameCanvasRef.current.setOnLevelUpCallback(handleLevelUp);
+    }
+  }, [gameLoaded]);
+
   const handleStartGame = () => {
     setGameStarted(true);
+  };
+
+  const handleLevelUp = () => {
+    setIsLevelUpCustomization(true);
+    setShowGunCustomization(true);
   };
 
   const handleCustomizeWeapon = () => {
@@ -79,6 +92,7 @@ export default function Home() {
     }
 
     // Show the customization modal
+    setIsLevelUpCustomization(false);
     setShowGunCustomization(true);
   };
 
@@ -88,6 +102,7 @@ export default function Home() {
   ) => {
     setWeaponStats(finalStats);
     setShowGunCustomization(false);
+    setIsLevelUpCustomization(false);
 
     // Update the weapon in the game
     if (gameCanvasRef.current && gameLoaded) {
@@ -97,6 +112,18 @@ export default function Home() {
 
   const handleCancelCustomization = () => {
     setShowGunCustomization(false);
+    setIsLevelUpCustomization(false);
+
+    // If we were in a level-up customization, we need to apply default bonuses
+    if (isLevelUpCustomization && gameCanvasRef.current && gameLoaded) {
+      // Apply default level up bonuses - we'll just update the current weapon with slight improvements
+      const improvedStats = { ...weaponStats };
+      improvedStats.damage *= 1.05; // 5% damage increase
+      improvedStats.fireRate *= 0.98; // 2% faster firing
+      improvedStats.reloadTime *= 0.97; // 3% faster reload
+      gameCanvasRef.current.updateWeapon(improvedStats);
+      setWeaponStats(improvedStats);
+    }
   };
 
   const handleGameLoaded = () => {
@@ -111,6 +138,7 @@ export default function Home() {
           ref={gameCanvasRef}
           initialWeaponStats={weaponStats}
           onLoaded={handleGameLoaded}
+          onLevelUp={handleLevelUp}
         />
       )}
 
@@ -121,6 +149,15 @@ export default function Home() {
         onCancel={handleCancelCustomization}
         isOpen={showGunCustomization}
         availableCredits={1000}
+        title={
+          isLevelUpCustomization ? "LEVEL UP! Choose your upgrade" : undefined
+        }
+        message={
+          isLevelUpCustomization
+            ? "You've gained a level! Choose how to upgrade your weapon:"
+            : undefined
+        }
+        isLevelUpCustomization={isLevelUpCustomization}
       />
 
       {/* Main UI - only show when game is not started */}

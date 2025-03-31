@@ -12,6 +12,7 @@ interface GameCanvasProps {
   height?: number;
   initialWeaponStats?: WeaponStats | null;
   onLoaded?: () => void;
+  onLevelUp?: () => void;
 }
 
 // Define the ref type
@@ -19,10 +20,14 @@ export interface GameCanvasRef {
   pause: () => void;
   resume: () => void;
   updateWeapon: (stats: WeaponStats) => void;
+  setOnLevelUpCallback: (callback: () => void) => void;
 }
 
 const GameCanvas = forwardRef<GameCanvasRef, GameCanvasProps>(
-  ({ width = 800, height = 600, initialWeaponStats, onLoaded }, ref) => {
+  (
+    { width = 800, height = 600, initialWeaponStats, onLoaded, onLevelUp },
+    ref
+  ) => {
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const gameLoopRef = useRef<GameLoop | null>(null);
     const initializedRef = useRef(false);
@@ -44,6 +49,11 @@ const GameCanvas = forwardRef<GameCanvasRef, GameCanvasProps>(
           gameLoopRef.current.updateWeapon(stats);
         }
       },
+      setOnLevelUpCallback: (callback: () => void) => {
+        if (gameLoopRef.current) {
+          gameLoopRef.current.setOnLevelUpCallback(callback);
+        }
+      },
     }));
 
     // Initialize the game loop only once
@@ -55,7 +65,12 @@ const GameCanvas = forwardRef<GameCanvasRef, GameCanvasProps>(
       canvas.height = height;
 
       const seed = Math.random().toString();
-      const gameLoop = new GameLoop(canvas, seed, initialWeaponStats);
+      const gameLoop = new GameLoop(
+        canvas,
+        seed,
+        initialWeaponStats,
+        onLevelUp
+      );
       gameLoopRef.current = gameLoop;
       gameLoop.start();
       initializedRef.current = true;
@@ -70,7 +85,7 @@ const GameCanvas = forwardRef<GameCanvasRef, GameCanvasProps>(
         gameLoopRef.current = null;
         initializedRef.current = false;
       };
-    }, []); // Empty dependency array - only run on mount/unmount
+    }, [onLevelUp]);
 
     // Handle canvas size updates separately
     useEffect(() => {

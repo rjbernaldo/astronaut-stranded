@@ -34,6 +34,15 @@ export interface WeaponStats {
   projectileCount: number;
   spread: number;
   recoil: number;
+  customized?: boolean;
+  parts?: {
+    barrel?: string;
+    slide?: string;
+    frame?: string;
+    trigger?: string;
+    magazine?: string;
+    internal?: string;
+  };
   // Add more properties as needed
 }
 

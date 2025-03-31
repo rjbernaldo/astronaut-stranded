@@ -68,14 +68,17 @@ export class GameLoop {
   };
 
   private animationFrameId: number | null = null;
+  private onLevelUpCallback: (() => void) | null = null;
 
   constructor(
     canvas: HTMLCanvasElement,
     seed?: string,
-    initialWeaponStats?: WeaponStats | null
+    initialWeaponStats?: WeaponStats | null,
+    onLevelUp?: () => void
   ) {
     this.canvas = canvas;
     this.ctx = canvas.getContext("2d")!;
+    this.onLevelUpCallback = onLevelUp || null;
 
     // Create map with random seed
     seed = seed || Math.random().toString();
@@ -437,7 +440,7 @@ export class GameLoop {
   private checkForLevelUp(): void {
     const ui = this.gameState.ui;
 
-    while (ui.playerXp >= ui.xpForNextLevel) {
+    if (ui.playerXp >= ui.xpForNextLevel) {
       // Level up!
       ui.playerLevel++;
 
@@ -453,15 +456,13 @@ export class GameLoop {
         baseXP * Math.pow(growthFactor, ui.playerLevel - 1)
       );
 
-      // Apply level-up bonuses to player
-      this.applyLevelUpBonuses();
+      console.log(`Level Up! You are now level ${ui.playerLevel}`);
 
-      // Add level up notification
-      this.addNotification(
-        `LEVEL UP! You are now level ${ui.playerLevel}`,
-        "#00AAFF",
-        5000
-      );
+      // Pause the game and open the customization menu if callback is set
+      if (this.onLevelUpCallback) {
+        this.pause();
+        this.onLevelUpCallback();
+      }
     }
   }
 
@@ -1417,5 +1418,10 @@ export class GameLoop {
       // Increase offset for next notification
       offsetY += textHeight + padding * 2 + 5;
     });
+  }
+
+  // Method to set the level up callback after initialization
+  setOnLevelUpCallback(callback: () => void): void {
+    this.onLevelUpCallback = callback;
   }
 }

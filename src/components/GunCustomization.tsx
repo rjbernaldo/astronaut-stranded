@@ -521,6 +521,9 @@ interface GunCustomizationProps {
   ) => void;
   onCancel: () => void;
   isOpen: boolean;
+  title?: string;
+  message?: string;
+  isLevelUpCustomization?: boolean;
 }
 
 export const GunCustomization: React.FC<GunCustomizationProps> = ({
@@ -529,6 +532,9 @@ export const GunCustomization: React.FC<GunCustomizationProps> = ({
   onSave,
   onCancel,
   isOpen,
+  title,
+  message,
+  isLevelUpCustomization = false,
 }) => {
   const [gunParts, setGunParts] = useState<GunPart[]>([]);
   const [equippedParts, setEquippedParts] =
@@ -1828,9 +1834,15 @@ export const GunCustomization: React.FC<GunCustomizationProps> = ({
 
   return (
     <div className="modal-overlay" onClick={onCancel}>
-      <div className="gun-customization" onClick={(e) => e.stopPropagation()}>
+      <div
+        className={`gun-customization ${
+          isLevelUpCustomization ? "level-up-customization" : ""
+        }`}
+        onClick={(e) => e.stopPropagation()}
+      >
         <div className="screen-header">
-          <h2>Weapon Customization</h2>
+          <h2>{title || "Weapon Customization"}</h2>
+          {message && <p className="level-up-message">{message}</p>}
         </div>
 
         <div className="top-section">
@@ -1851,10 +1863,10 @@ export const GunCustomization: React.FC<GunCustomizationProps> = ({
 
         <div className="action-buttons">
           <button className="cancel-button" onClick={onCancel}>
-            Cancel
+            {isLevelUpCustomization ? "Skip Upgrade" : "Cancel"}
           </button>
           <button className="save-button" onClick={handleSave}>
-            Save Changes
+            {isLevelUpCustomization ? "Apply Upgrade" : "Save Changes"}
           </button>
         </div>
       </div>
