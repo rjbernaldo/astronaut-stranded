@@ -112,6 +112,15 @@ export interface GameStateData {
   mouseDown: boolean;
   keysPressed: Set<string>;
   currentWeaponStats: WeaponStats | null;
+  notifications: Notification[];
+}
+
+// Add this interface for notifications
+export interface Notification {
+  message: string;
+  color: string;
+  startTime: number;
+  duration: number; // in milliseconds
 }
 
 /**
@@ -144,9 +153,6 @@ export class CentralGameState {
     const startY = Math.floor(map.height / 2) * map.tileSize;
     const player = new Astronaut({ x: startX, y: startY }, initialWeaponStats);
 
-    // Ensure unlimited ammo reserves for all weapons
-    this.ensureUnlimitedAmmoReserves(player);
-
     // Initial state
     this.state = {
       player,
@@ -165,6 +171,9 @@ export class CentralGameState {
         difficultyLevel: INITIAL_DIFFICULTY,
         gameTime: 0,
         nextLevelTime: DIFFICULTY_SCALING_INTERVAL,
+        playerLevel: 1,
+        playerXp: 0,
+        xpForNextLevel: 100, // Base XP needed for level 2
       },
       isPaused: false,
       autoAimEnabled: true,
@@ -172,17 +181,8 @@ export class CentralGameState {
       mouseDown: false,
       keysPressed: new Set<string>(),
       currentWeaponStats: initialWeaponStats || null,
+      notifications: [],
     };
-  }
-
-  /**
-   * Helper method to ensure all weapons have unlimited ammo reserves
-   */
-  private ensureUnlimitedAmmoReserves(player: Astronaut): void {
-    // Set unlimited reserves for all weapons
-    ["pistol", "rifle", "shotgun"].forEach((weapon) => {
-      player.reserves.set(weapon, 999999);
-    });
   }
 
   // Getters
@@ -388,19 +388,6 @@ export class CentralGameState {
 
     if (!state.player.activeWeapon) return state;
 
-    // Check if weapon is empty and needs to be reloaded
-    const weaponName = state.player.activeWeapon.stats.name;
-    const currentAmmo = state.player.ammo.get(weaponName) || 0;
-
-    // If no ammo, ensure we have reserves and reload
-    if (currentAmmo <= 0) {
-      // Set a large number for reserves to simulate unlimited ammo
-      state.player.reserves.set(weaponName, 999999);
-      state.player.reload();
-      // Return state since we can't shoot while reloading
-      return state;
-    }
-
     const didShoot = state.player.shoot(timestamp);
 
     if (didShoot) {
@@ -424,14 +411,6 @@ export class CentralGameState {
     state: GameStateData,
     action: ReloadAction
   ): GameStateData {
-    // Ensure player has unlimited reserve ammo for all weapons
-    if (state.player.activeWeapon) {
-      const weaponName = state.player.activeWeapon.stats.name;
-      // Set a large number for reserves to simulate unlimited ammo
-      state.player.reserves.set(weaponName, 999999);
-    }
-
-    // Now call reload which will use the reserves
     state.player.reload();
     return state;
   }
@@ -533,9 +512,17 @@ export class CentralGameState {
           enemy.takeDamage(projectile.damage);
           projectile.deactivate();
 
-          // Add score for hit
+          // Add score and XP for hit
           if (!enemy.active) {
-            state.ui.score += 10;
+            const scoreValue = enemy.getScoreValue();
+            // Add score
+            state.ui.score += scoreValue;
+
+            // Add XP (same as score for now)
+            state.ui.playerXp += scoreValue;
+
+            // Check for level up
+            this.checkForLevelUp(state.ui);
           }
 
           break;
@@ -639,17 +626,6 @@ export class CentralGameState {
       // Set player rotation to aim at the enemy
       state.player.setRotation(angle);
 
-      // Check if we need to reload
-      const weaponName = state.player.activeWeapon.stats.name;
-      const currentAmmo = state.player.ammo.get(weaponName) || 0;
-
-      if (currentAmmo <= 0) {
-        // Ensure unlimited reserves
-        state.player.reserves.set(weaponName, 999999);
-        state.player.reload();
-        return state;
-      }
-
       // Use the shoot action
       return this.handleShoot(state, {
         type: ActionType.SHOOT,
@@ -658,5 +634,91 @@ export class CentralGameState {
     }
 
     return state;
+  }
+
+  /**
+   * Check if player has enough XP to level up
+   * Uses an exponential curve for level requirements
+   */
+  private checkForLevelUp(ui: GameUIState): void {
+    while (ui.playerXp >= ui.xpForNextLevel) {
+      // Level up!
+      ui.playerLevel++;
+
+      // Subtract the XP used for this level
+      ui.playerXp -= ui.xpForNextLevel;
+
+      // Calculate new XP requirement with exponential scaling
+      // Formula: baseXP * (growthFactor^(level-1))
+      // This gives us: Level 1->2: 100 XP, 2->3: 200 XP, 3->4: 400 XP, etc.
+      const baseXP = 100;
+      const growthFactor = 2;
+      ui.xpForNextLevel = Math.round(
+        baseXP * Math.pow(growthFactor, ui.playerLevel - 1)
+      );
+
+      // Apply level-up bonuses to player
+      this.applyLevelUpBonuses(ui.playerLevel);
+    }
+  }
+
+  /**
+   * Apply bonuses to player based on their level
+   */
+  private applyLevelUpBonuses(level: number): void {
+    const state = this.getState();
+
+    // Improve player stats with each level
+    // Speed bonus: +1% per level
+    state.player.speed = state.player.speed * (1 + 0.01 * level);
+
+    // Weapons get stronger with level
+    if (state.player.activeWeapon) {
+      const weaponName = state.player.activeWeapon.stats.name;
+
+      // Get all weapons and improve their stats
+      state.player.weapons.forEach((weapon, name) => {
+        const stats = { ...weapon.stats };
+
+        // Damage: +5% per level
+        stats.damage *= 1 + 0.05 * level;
+
+        // Fire rate: -2% cooldown per level (faster firing)
+        stats.fireRate *= 1 - 0.02 * level;
+        stats.fireRate = Math.max(0.05, stats.fireRate); // Cap to prevent too fast firing
+
+        // Reload time: -3% per level (faster reloading)
+        stats.reloadTime *= 1 - 0.03 * level;
+        stats.reloadTime = Math.max(0.2, stats.reloadTime); // Minimum reload time
+
+        // Update the weapon with new stats
+        state.player.updateWeapon(stats);
+      });
+    }
+
+    // Add level up notification
+    this.addNotification(
+      `LEVEL UP! You are now level ${level}`,
+      "#00AAFF",
+      5000
+    );
+
+    console.log(`Level Up! You are now level ${level}`);
+  }
+
+  // Add this method to create notifications
+  addNotification(
+    message: string,
+    color: string = "#FFFFFF",
+    duration: number = 3000
+  ): void {
+    const notification: Notification = {
+      message,
+      color,
+      startTime: performance.now(),
+      duration,
+    };
+
+    this.state.notifications.push(notification);
   }
 }

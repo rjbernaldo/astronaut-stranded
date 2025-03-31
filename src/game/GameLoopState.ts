@@ -348,6 +348,9 @@ export class GameLoopState {
     // Render HUD
     this.renderHUD();
 
+    // Render notifications
+    this.renderNotifications();
+
     // Render game over screen if needed
     if (state.ui.isGameOver) {
       this.renderGameOver();
@@ -450,6 +453,30 @@ export class GameLoopState {
       diffBarY + 15
     );
 
+    // Draw player level progress bar
+    const levelBarY = diffBarY + barHeight + 10;
+    ctx.fillStyle = "#333333";
+    ctx.fillRect(padding, levelBarY, barWidth, barHeight);
+
+    // Calculate XP progress
+    const xpProgress = state.ui.playerXp / state.ui.xpForNextLevel;
+
+    // Draw level progress bar
+    ctx.fillStyle = "#00AAFF"; // Blue color for XP
+    ctx.fillRect(padding, levelBarY, barWidth * xpProgress, barHeight);
+    ctx.strokeStyle = "#FFFFFF";
+    ctx.strokeRect(padding, levelBarY, barWidth, barHeight);
+
+    // Draw level text
+    ctx.fillStyle = "#FFFFFF";
+    ctx.font = "16px monospace";
+    ctx.textAlign = "left";
+    ctx.fillText(
+      `Level: ${state.ui.playerLevel} (${state.ui.playerXp}/${state.ui.xpForNextLevel} XP)`,
+      padding + 10,
+      levelBarY + 15
+    );
+
     // Draw time info
     const minutes = Math.floor(state.ui.gameTime / 60);
     const seconds = Math.floor(state.ui.gameTime % 60);
@@ -461,13 +488,13 @@ export class GameLoopState {
     ctx.fillText(
       `Time: ${minutes}:${seconds.toString().padStart(2, "0")}`,
       padding,
-      diffBarY + barHeight + 20
+      levelBarY + barHeight + 20
     );
 
     ctx.fillText(
       `Next level: ${timeNextLevel}s`,
       padding,
-      diffBarY + barHeight + 40
+      levelBarY + barHeight + 40
     );
 
     // Draw ammo counter
@@ -728,5 +755,74 @@ export class GameLoopState {
     // Restart prompt
     ctx.font = "16px monospace";
     ctx.fillText("Refresh the page to play again", centerX, centerY + 150);
+  }
+
+  /**
+   * Render notifications
+   */
+  private renderNotifications(): void {
+    const state = this.gameState.getState();
+    const ctx = this.gameState.getContext();
+    const canvas = this.gameState.getCanvas();
+    const currentTime = performance.now();
+
+    // Position notifications in the center-top of the screen
+    const startY = 120;
+    const padding = 10;
+    let offsetY = 0;
+
+    // Filter and update notifications (remove expired ones)
+    state.notifications = state.notifications.filter((notification) => {
+      const elapsed = currentTime - notification.startTime;
+      return elapsed < notification.duration;
+    });
+
+    // Draw each notification
+    state.notifications.forEach((notification, index) => {
+      const elapsed = currentTime - notification.startTime;
+
+      // Calculate opacity (fade in/out effect)
+      let opacity = 1;
+      const fadeTime = 500; // time spent fading in/out in ms
+
+      if (elapsed < fadeTime) {
+        // Fade in
+        opacity = elapsed / fadeTime;
+      } else if (elapsed > notification.duration - fadeTime) {
+        // Fade out
+        opacity = (notification.duration - elapsed) / fadeTime;
+      }
+
+      // Set text style
+      ctx.font = "bold 24px monospace";
+      ctx.textAlign = "center";
+
+      // Calculate text metrics for background
+      const metrics = ctx.measureText(notification.message);
+      const textWidth = metrics.width;
+      const textHeight = 30; // Approximate text height
+
+      // Draw semi-transparent background
+      ctx.fillStyle = `rgba(0, 0, 0, ${opacity * 0.7})`;
+      ctx.fillRect(
+        canvas.width / 2 - textWidth / 2 - padding,
+        startY + offsetY,
+        textWidth + padding * 2,
+        textHeight + padding * 2
+      );
+
+      // Draw text with notification color and opacity
+      ctx.fillStyle = notification.color;
+      ctx.globalAlpha = opacity;
+      ctx.fillText(
+        notification.message,
+        canvas.width / 2,
+        startY + offsetY + textHeight + padding / 2
+      );
+      ctx.globalAlpha = 1;
+
+      // Increase offset for next notification
+      offsetY += textHeight + padding * 2 + 5;
+    });
   }
 }
