@@ -8,6 +8,7 @@ export class Projectile {
   distanceTraveled: number;
   active: boolean;
   speed: number;
+  pierce: number; // Number of enemies the projectile can penetrate
 
   constructor(options: ProjectileOptions) {
     this.position = { ...options.position };
@@ -17,6 +18,7 @@ export class Projectile {
     this.distanceTraveled = 0;
     this.active = true;
     this.speed = options.speed * 2.5;
+    this.pierce = options.pierce || 1; // Default to 1 if not specified
   }
 
   update(deltaTime: number): void {

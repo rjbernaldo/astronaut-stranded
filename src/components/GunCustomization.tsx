@@ -1,6 +1,22 @@
 import React, { useState, useEffect } from "react";
 import { WeaponStats } from "../types";
-import { gunCustomizationConfig } from "../config/gunCustomizationConfig";
+import {
+  INITIAL_WEAPON_STATS,
+  DEFAULT_EQUIPPED_PARTS,
+  MAX_STATS,
+  WEAPON_CATEGORIES,
+  WeaponCategory,
+} from "../constants/weaponStats";
+
+// Constants for weapon stat growth
+const GROWTH_FACTOR = 2; // Fixed 2x growth for all stats
+
+// Stat upgrade probabilities
+const UPGRADE_PROBABILITIES = {
+  threeStatProbability: 0.1, // 10% chance to increase 3 stats
+  twoStatProbability: 0.3, // 30% chance to increase 2 stats
+  // 60% chance to increase 1 stat (default)
+};
 
 // Define part categories
 type PartCategory =
@@ -11,22 +27,21 @@ type PartCategory =
   | "magazine"
   | "internal";
 
-type StatName =
-  | "damage"
-  | "fireRate"
-  | "magazineSize"
-  | "reloadTime"
-  | "recoil"
-  | "projectileCount"
-  | "spread"
-  | "range"
-  | "accuracy"
-  | "reloadSpeed";
-
+// Define proper interface for part stats with required properties
 interface PartStat {
   name: StatName;
   value: number;
 }
+
+// Define specific stat names as a union type
+type StatName =
+  | "damage"
+  | "range"
+  | "fireRate"
+  | "magazineSize"
+  | "reloadTime"
+  | "pierce"
+  | "projectileCount";
 
 // Define gun part interface
 interface GunPart {
@@ -37,8 +52,6 @@ interface GunPart {
   stats: PartStat[];
   description: string;
   unlocked: boolean;
-  cost: number;
-  price: number;
 }
 
 // Define part name prefixes and suffixes for random generation
@@ -232,33 +245,60 @@ const partDescriptions: Record<PartCategory, string[]> = {
   ],
 };
 
-// Function to generate random stat modifications according to config rules
-const generateStatsForPart = (category: PartCategory): PartStat[] => {
-  const possibleStats: Record<PartCategory, StatName[]> = {
-    barrel: ["damage", "range", "recoil", "spread"],
-    slide: ["fireRate", "recoil", "spread"],
-    frame: ["recoil", "fireRate", "damage"],
-    trigger: ["fireRate", "spread", "reloadTime"],
-    magazine: ["magazineSize", "reloadTime"],
-    internal: ["damage", "spread", "fireRate", "recoil"],
-  };
+// Helper function to get a random element from an array
+const getRandomElement = <T extends unknown>(array: T[]): T => {
+  return array[Math.floor(Math.random() * array.length)];
+};
 
-  // Get all available stats for this category
-  const availableStats = [...possibleStats[category]];
+// Define possible stats for each part category
+const possibleStats: Record<PartCategory, StatName[]> = {
+  barrel: ["damage", "range", "projectileCount"],
+  slide: ["fireRate", "pierce"],
+  frame: ["fireRate", "damage", "pierce"],
+  trigger: ["fireRate", "reloadTime"],
+  magazine: ["magazineSize", "reloadTime"],
+  internal: ["damage", "fireRate", "projectileCount"],
+};
+
+// Helper function to check if a stat is maxed out
+const isStatMaxed = (statName: StatName, currentValue: number): boolean => {
+  if (statName === "fireRate") {
+    const currentRPS = 1 / currentValue;
+    return currentRPS >= 50.0; // 50 RPS is the max
+  }
+  if (statName === "reloadTime") {
+    return currentValue <= 0;
+  }
+  return false;
+};
+
+// Helper function to generate stats for a part
+const generateStatsForPart = (
+  category: PartCategory,
+  currentStats: GunCustomizationStats
+): PartStat[] => {
+  // Get all available stats for this category that aren't maxed out
+  const availableStats = possibleStats[category].filter(
+    (statName) => !isStatMaxed(statName, currentStats[statName])
+  );
+
+  // If no stats are available (all maxed), return empty array to trigger re-roll
+  if (availableStats.length === 0) {
+    return [];
+  }
+
   const stats: PartStat[] = [];
 
   // Determine how many stats to increment based on probabilities
   const incrementRoll = Math.random();
   let numStatsToIncrement = 1; // Default to 1
 
-  if (
-    incrementRoll < gunCustomizationConfig.statIncrements.threeStatProbability
-  ) {
+  if (incrementRoll < UPGRADE_PROBABILITIES.threeStatProbability) {
     numStatsToIncrement = 3;
   } else if (
     incrementRoll <
-    gunCustomizationConfig.statIncrements.threeStatProbability +
-      gunCustomizationConfig.statIncrements.twoStatProbability
+    UPGRADE_PROBABILITIES.threeStatProbability +
+      UPGRADE_PROBABILITIES.twoStatProbability
   ) {
     numStatsToIncrement = 2;
   }
@@ -267,7 +307,6 @@ const generateStatsForPart = (category: PartCategory): PartStat[] => {
   numStatsToIncrement = Math.min(numStatsToIncrement, availableStats.length);
 
   // Generate the positive stat changes
-  let totalIncrementPercentage = 0;
   for (let i = 0; i < numStatsToIncrement; i++) {
     if (availableStats.length === 0) break;
 
@@ -276,183 +315,102 @@ const generateStatsForPart = (category: PartCategory): PartStat[] => {
     const statName = availableStats[statIndex];
     availableStats.splice(statIndex, 1); // Remove so we don't pick it again
 
-    // Determine if this will be a large increment
-    const isLargeIncrement =
-      Math.random() <
-      gunCustomizationConfig.incrementAmounts.largeIncrementProbability;
-
-    // Calculate the increment value
-    let incrementValue;
-    if (isLargeIncrement) {
-      // 110% to 200% increase
-      incrementValue =
-        Math.random() *
-          (gunCustomizationConfig.incrementAmounts.maxLargeIncrement -
-            gunCustomizationConfig.incrementAmounts.minLargeIncrement) +
-        gunCustomizationConfig.incrementAmounts.minLargeIncrement;
-    } else {
-      // 10% to 100% increase
-      incrementValue =
-        Math.random() *
-          (gunCustomizationConfig.incrementAmounts.maxNormalIncrement -
-            gunCustomizationConfig.incrementAmounts.minNormalIncrement) +
-        gunCustomizationConfig.incrementAmounts.minNormalIncrement;
-    }
-
-    // Scale the increment based on the stat
+    // Calculate stat increase using the fixed growth factor
     let scaledValue;
+
     if (statName === "magazineSize") {
-      scaledValue = Math.floor(incrementValue * 3); // 0.3-6 extra bullets, rounded down
+      // For magazine size, add 100% of current value
+      scaledValue = Math.max(1, Math.floor(currentStats.magazineSize));
     } else if (statName === "reloadTime") {
-      scaledValue = -Math.floor(incrementValue * 0.5); // Negative because lower is better for reload time
+      // For reload time, decrease by 50% (equivalent to 100% improvement)
+      const currentValue = currentStats.reloadTime;
+      // Reduce reload time by 50% without going below 0
+      scaledValue = -Math.min(currentValue * 0.5, currentValue);
     } else if (statName === "fireRate") {
-      scaledValue = Math.floor(incrementValue * 0.2); // 0.02-0.4 fire rate increase
-    } else if (statName === "spread") {
-      scaledValue = -Math.floor(incrementValue * 5); // Negative because lower spread is better
+      // For fire rate, decrease time between shots (negative value is good)
+      const currentRPS = 1 / currentStats.fireRate;
+      const targetRPS = currentRPS * 2; // Double the RPS (100% increase)
+      // Cap at 50 RPS
+      const cappedRPS = Math.min(50, targetRPS);
+      const newFireRateTime = 1 / cappedRPS;
+      scaledValue = newFireRateTime - currentStats.fireRate;
     } else if (statName === "damage") {
-      scaledValue = Math.floor(incrementValue * 5); // 0.5-10 damage increase
-    } else if (statName === "recoil") {
-      scaledValue = -Math.floor(incrementValue * 5); // Negative because lower recoil is better
+      // Add 100% of current damage
+      scaledValue = Math.max(1, Math.floor(currentStats.damage));
+    } else if (statName === "pierce") {
+      // Add 100% of current pierce, minimum 1
+      scaledValue = Math.max(1, Math.floor(currentStats.pierce));
+    } else if (statName === "projectileCount") {
+      // Add 100% of current projectile count, minimum 1
+      scaledValue = Math.max(1, Math.floor(currentStats.projectileCount));
     } else if (statName === "range") {
-      scaledValue = Math.floor(incrementValue * 10); // 1-20 range increase
+      // Add 100% of current range
+      scaledValue = Math.max(10, Math.floor(currentStats.range));
     } else {
-      scaledValue = Math.floor(incrementValue * 5); // Default scaling
+      // Default growth for other stats - 100% increase
+      scaledValue = Math.max(1, Math.floor(currentStats[statName]));
     }
 
-    // Ensure we don't have zero values due to rounding down
+    // Ensure we don't have zero values
     if (scaledValue === 0) {
       // If positive increment, set to at least 1
-      if (incrementValue > 0) {
+      if (statName !== "reloadTime" && statName !== "fireRate") {
         scaledValue = 1;
       }
-      // If negative decrement, set to at least -1
-      else if (incrementValue < 0) {
-        scaledValue = -1;
+      // If negative decrement for stats where lower is better, set to at least -0.1
+      else if (statName === "reloadTime" || statName === "fireRate") {
+        scaledValue = -0.1;
       }
     }
 
     stats.push({ name: statName, value: scaledValue });
-    totalIncrementPercentage += incrementValue;
-  }
-
-  // Determine if we should decrement stats
-  const decrementRoll = Math.random();
-  let numStatsToDecrement = 0;
-
-  if (
-    decrementRoll < gunCustomizationConfig.statDecrements.twoStatProbability
-  ) {
-    numStatsToDecrement = 2;
-  } else if (
-    decrementRoll <
-    gunCustomizationConfig.statDecrements.twoStatProbability +
-      gunCustomizationConfig.statDecrements.oneStatProbability
-  ) {
-    numStatsToDecrement = 1;
-  }
-
-  // Apply decrements if needed
-  if (numStatsToDecrement > 0 && availableStats.length > 0) {
-    // Calculate total decrement based on increments
-    const decrementPercentage =
-      totalIncrementPercentage *
-      (Math.random() *
-        (gunCustomizationConfig.decrementSizing.maxPercentOfIncrement -
-          gunCustomizationConfig.decrementSizing.minPercentOfIncrement) +
-        gunCustomizationConfig.decrementSizing.minPercentOfIncrement);
-
-    // Distribute decrement across chosen stats
-    const decrementPerStat = decrementPercentage / numStatsToDecrement;
-
-    for (let i = 0; i < numStatsToDecrement; i++) {
-      if (availableStats.length === 0) break;
-
-      // Pick a random stat
-      const statIndex = Math.floor(Math.random() * availableStats.length);
-      const statName = availableStats[statIndex];
-      availableStats.splice(statIndex, 1); // Remove so we don't pick it again
-
-      // Scale the decrement based on the stat
-      let scaledValue;
-      if (statName === "magazineSize") {
-        scaledValue = -Math.floor(decrementPerStat * 2); // 0.2-2 fewer bullets
-      } else if (statName === "reloadTime") {
-        scaledValue = Math.floor(decrementPerStat * 0.3); // Positive because higher is worse for reload time
-      } else if (statName === "fireRate") {
-        scaledValue = -Math.floor(decrementPerStat * 0.1); // 0.01-0.1 fire rate decrease
-      } else if (statName === "spread") {
-        scaledValue = Math.floor(decrementPerStat * 3); // Positive because higher spread is worse
-      } else if (statName === "damage") {
-        scaledValue = -Math.floor(decrementPerStat * 3); // 0.3-3 damage decrease
-      } else if (statName === "recoil") {
-        scaledValue = Math.floor(decrementPerStat * 3); // Positive because higher recoil is worse
-      } else if (statName === "range") {
-        scaledValue = -Math.floor(decrementPerStat * 5); // 0.5-5 range decrease
-      } else {
-        scaledValue = -Math.floor(decrementPerStat * 3); // Default scaling
-      }
-
-      // Ensure non-zero values for decrements too
-      if (scaledValue === 0) {
-        // If supposed to be a negative value, set to -1
-        if (
-          decrementPerStat > 0 &&
-          statName !== "reloadTime" &&
-          statName !== "spread" &&
-          statName !== "recoil"
-        ) {
-          scaledValue = -1;
-        }
-        // If supposed to be positive (for certain stats where higher is worse)
-        else if (decrementPerStat > 0) {
-          scaledValue = 1;
-        }
-      }
-
-      stats.push({ name: statName, value: scaledValue });
-    }
   }
 
   return stats;
 };
 
 // Function to randomly generate parts
-const generateRandomParts = (): GunPart[] => {
+const generateRandomParts = (
+  currentStats?: GunCustomizationStats
+): GunPart[] => {
   const parts: GunPart[] = [];
+  const statsToUse = currentStats || INITIAL_WEAPON_STATS;
 
-  // Generate standard parts (always available)
-  const categories: PartCategory[] = [
-    "barrel",
-    "slide",
-    "frame",
-    "trigger",
-    "magazine",
-    "internal",
-  ];
-
-  // Add standard parts
-  categories.forEach((category) => {
-    parts.push({
-      id: `standard-${category}`,
-      name: `Standard ${category.charAt(0).toUpperCase() + category.slice(1)}`,
-      category,
-      image: "/gun-parts/internal-standard.png",
-      stats: [
-        // Standard parts have no stat bonuses
-        { name: category === "barrel" ? "damage" : "recoil", value: 0 },
-      ],
-      description: partDescriptions[category][0],
-      unlocked: true,
-      cost: 0,
-      price: 0,
-    });
-  });
+  // Keep track of used categories to ensure variety
+  const usedCategories = new Set<PartCategory>();
 
   // Generate exactly 3 random parts (one at a time, from random categories)
-  for (let i = 0; i < 3; i++) {
-    // Pick a random category
-    const randomCategoryIndex = Math.floor(Math.random() * categories.length);
-    const category = categories[randomCategoryIndex];
+  let attempts = 0;
+  const maxAttempts = 30; // Increased max attempts to ensure we get valid parts
+  let generatedCount = 0;
+
+  while (generatedCount < 3 && attempts < maxAttempts) {
+    attempts++;
+
+    // Get available categories (ones that aren't maxed out)
+    const availableCategories = WEAPON_CATEGORIES.filter((category) => {
+      // Skip if we've already used this category
+      if (usedCategories.has(category)) return false;
+
+      // Check if any stats in this category aren't maxed
+      const categoryStats = possibleStats[category];
+      return categoryStats.some(
+        (statName) => !isStatMaxed(statName, statsToUse[statName])
+      );
+    });
+
+    // If no categories available, clear used categories and try again
+    if (availableCategories.length === 0) {
+      usedCategories.clear();
+      continue;
+    }
+
+    // Pick a random category from available ones
+    const category =
+      availableCategories[
+        Math.floor(Math.random() * availableCategories.length)
+      ];
+    usedCategories.add(category);
 
     const prefixIndex = Math.floor(
       Math.random() * partNamePrefixes[category].length
@@ -461,9 +419,8 @@ const generateRandomParts = (): GunPart[] => {
       Math.random() * partNameSuffixes[category].length
     );
 
-    // Skip if we generate "Standard [Category]" again
+    // Skip if we generate "Standard [Category]"
     if (partNamePrefixes[category][prefixIndex] === "Standard") {
-      i--; // Try again
       continue;
     }
 
@@ -474,43 +431,84 @@ const generateRandomParts = (): GunPart[] => {
       partDescriptions[category].length - 1
     );
 
-    // Generate stats using the configuration-based method
-    const stats = generateStatsForPart(category);
+    // Try to generate valid stats up to 5 times for this part
+    let validStats: PartStat[] = [];
+    let statAttempts = 0;
+    const maxStatAttempts = 5;
 
-    // Calculate price based on the value of the stats
-    const totalPositiveValue = stats.reduce((sum, stat) => {
-      return sum + (stat.value > 0 ? Math.abs(stat.value) : 0);
-    }, 0);
+    while (statAttempts < maxStatAttempts) {
+      statAttempts++;
+      // Generate stats using the configuration-based method
+      const stats = generateStatsForPart(category, statsToUse);
 
-    // Price is related to the total positive value with some randomness
-    const basePrice = Math.round(totalPositiveValue * 50);
-    const price = basePrice + Math.floor(Math.random() * (basePrice / 2));
+      // Skip this part if no valid stats were generated (all maxed)
+      if (stats.length === 0) {
+        continue;
+      }
+
+      // Check if any of the generated stats would max out
+      const wouldMaxOut = stats.some((stat) => {
+        const statName = stat.name;
+        const currentValue = statsToUse[statName];
+        const newValue = currentValue + stat.value;
+
+        // For fireRate, check if we'd exceed max RPS
+        if (statName === "fireRate") {
+          const currentRPS = 1 / currentValue;
+          const newRPS = 1 / newValue;
+          return newRPS >= 50.0;
+        }
+
+        // For reloadTime, check if we'd go below 0
+        if (statName === "reloadTime") {
+          return newValue <= 0;
+        }
+
+        return false;
+      });
+
+      // If none of the stats would max out, use these stats
+      if (!wouldMaxOut) {
+        validStats = stats;
+        break;
+      }
+    }
+
+    // If we couldn't generate valid stats after multiple attempts, just use what we have
+    if (validStats.length === 0) {
+      continue;
+    }
 
     parts.push({
-      id: `${prefix.toLowerCase()}-${category}-${i}`,
+      id: `${prefix.toLowerCase()}-${category}-${generatedCount}`,
       name: `${prefix} ${suffix}`,
       category,
       image: "/gun-parts/internal-standard.png",
-      stats,
+      stats: validStats,
       description: partDescriptions[category][descIndex],
-      unlocked: true, // All parts are unlocked
-      cost: price,
-      price: price,
+      unlocked: true,
     });
+
+    generatedCount++;
   }
 
+  // If we couldn't generate enough parts, return what we have
   return parts;
 };
 
 // Default equipped parts (one of each category)
-const defaultEquippedParts = {
-  barrel: "standard-barrel",
-  magazine: "standard-magazine",
-  trigger: "standard-trigger",
-  frame: "standard-frame",
-  slide: "standard-slide",
-  internal: "standard-internal",
-};
+const defaultEquippedParts = DEFAULT_EQUIPPED_PARTS;
+
+// Define custom stats interface with all properties as required
+interface GunCustomizationStats {
+  damage: number;
+  range: number;
+  fireRate: number;
+  magazineSize: number;
+  reloadTime: number;
+  pierce: number;
+  projectileCount: number;
+}
 
 interface GunCustomizationProps {
   availableCredits: number;
@@ -526,8 +524,25 @@ interface GunCustomizationProps {
   isLevelUpCustomization?: boolean;
 }
 
+// Add a type for display names that's separate from StatName
+type DisplayStatName = string;
+
+// Helper functions for formatting values
+const formatDecimal = (value: number): string => {
+  return value.toFixed(1);
+};
+
+const formatRPS = (fireRate: number): string => {
+  const rps = 1 / fireRate;
+  return rps.toFixed(1) + " RPS";
+};
+
+const formatSeconds = (value: number): string => {
+  return value.toFixed(2) + "s";
+};
+
 export const GunCustomization: React.FC<GunCustomizationProps> = ({
-  availableCredits,
+  availableCredits = 0,
   initialWeaponStats,
   onSave,
   onCancel,
@@ -537,29 +552,31 @@ export const GunCustomization: React.FC<GunCustomizationProps> = ({
   isLevelUpCustomization = false,
 }) => {
   const [gunParts, setGunParts] = useState<GunPart[]>([]);
-  const [equippedParts, setEquippedParts] =
-    useState<Record<PartCategory, string>>(defaultEquippedParts);
+  const [equippedParts, setEquippedParts] = useState<
+    Record<PartCategory, string>
+  >(DEFAULT_EQUIPPED_PARTS);
   const [hoveredPart, setHoveredPart] = useState<string | null>(null);
-  const [gunStats, setGunStats] = useState({
-    damage: 10,
-    fireRate: 60,
-    magazineSize: 7,
-    reloadTime: 2.0,
-    recoil: 40,
-    range: 50,
-    accuracy: 70,
-    reloadSpeed: 65,
+  const [gunStats, setGunStats] = useState<GunCustomizationStats>({
+    damage: initialWeaponStats.damage,
+    range: initialWeaponStats.range,
+    fireRate: initialWeaponStats.fireRate,
+    magazineSize: initialWeaponStats.magazineSize,
+    reloadTime: initialWeaponStats.reloadTime,
+    pierce: initialWeaponStats.pierce || 1,
+    projectileCount: initialWeaponStats.projectileCount,
   });
 
-  // Add preview stats for hovering
-  const [previewStats, setPreviewStats] = useState<typeof gunStats | null>(
-    null
-  );
+  // Preview stats when hovering over a part
+  const [previewStats, setPreviewStats] =
+    useState<GunCustomizationStats | null>(null);
 
-  // Generate random parts when component mounts
+  // Generate random parts when component mounts OR when the modal opens
   useEffect(() => {
-    setGunParts(generateRandomParts());
-  }, []);
+    if (isOpen) {
+      const initialStats = calculateStats();
+      setGunParts(generateRandomParts(initialStats));
+    }
+  }, [isOpen]);
 
   // Get parts for a category, excluding the equipped part
   const getPartsForCategory = (category: PartCategory) => {
@@ -575,94 +592,339 @@ export const GunCustomization: React.FC<GunCustomizationProps> = ({
     return gunParts.find((part) => part.id === partId);
   };
 
-  // Calculate stats based on equipped parts and optionally a preview part
-  const calculateStats = (previewPartId: string | null = null) => {
-    // Start with base stats
-    const baseStats = {
-      damage: 10,
-      accuracy: 70,
-      range: 50,
-      fireRate: 60,
-      reloadSpeed: 65,
-      recoil: 40,
-      magazineSize: 7,
-      reloadTime: 2.0,
-    };
+  // Create a new shared function to compute final weapon stats directly
+  // Apply parts additively (cumulative effects)
+  const computeWeaponStats = (
+    baseStats: GunCustomizationStats,
+    upgradePart: GunPart | null,
+    partsToUse: Record<PartCategory, string> = equippedParts
+  ): WeaponStats => {
+    // Clone the base stats to avoid modifying the original
+    const newStats = { ...baseStats };
 
-    // Apply modifiers from all equipped parts
-    Object.entries(equippedParts).forEach(([category, partId]) => {
-      // Skip this category if we're previewing a part for this category
-      if (
-        previewPartId &&
-        gunParts.find((p) => p.id === previewPartId)?.category === category
-      ) {
-        return;
-      }
+    // If we have an upgrade part, apply its stats additively
+    if (upgradePart) {
+      upgradePart.stats.forEach((statItem) => {
+        let statKey = statItem.name;
+        let statValue = statItem.value;
 
-      const part = gunParts.find((p) => p.id === partId);
-      if (part) {
-        part.stats.forEach((statItem) => {
-          // Convert the new stat format to the old format for compatibility
-          let statKey = statItem.name;
-          if (statKey === "spread") statKey = "accuracy"; // Spread is the inverse of accuracy
-
-          if (statKey in baseStats) {
-            // For spread/accuracy, the relationship is inverted
-            if (statKey === "accuracy") {
-              baseStats[statKey as keyof typeof baseStats] -= statItem.value;
-            } else {
-              baseStats[statKey as keyof typeof baseStats] += statItem.value;
-            }
+        if (statKey in newStats) {
+          // For reload time, apply direct value change (not percentage)
+          if (statKey === "reloadTime") {
+            // Simply add the value (negative values reduce reload time)
+            newStats[statKey as keyof typeof newStats] = Math.max(
+              0,
+              newStats[statKey as keyof typeof newStats] + statValue
+            );
           }
-        });
-      }
-    });
-
-    // Apply the preview part if provided
-    if (previewPartId) {
-      const previewPart = gunParts.find((p) => p.id === previewPartId);
-      if (previewPart) {
-        previewPart.stats.forEach((statItem) => {
-          // Convert the new stat format to the old format for compatibility
-          let statKey = statItem.name;
-          if (statKey === "spread") statKey = "accuracy"; // Spread is the inverse of accuracy
-
-          if (statKey in baseStats) {
-            // For spread/accuracy, the relationship is inverted
-            if (statKey === "accuracy") {
-              baseStats[statKey as keyof typeof baseStats] -= statItem.value;
-            } else {
-              baseStats[statKey as keyof typeof baseStats] += statItem.value;
-            }
+          // All other stats are always applied additively
+          else {
+            // For all stats, we add the value (negative values for stats where lower is better)
+            newStats[statKey as keyof typeof newStats] += statValue;
           }
-        });
-      }
+        }
+      });
     }
 
-    // Ensure stats stay within reasonable bounds (0-100)
-    Object.keys(baseStats).forEach((key) => {
-      const stat = key as keyof typeof baseStats;
-      if (stat !== "magazineSize" && stat !== "reloadTime") {
-        baseStats[stat] = Math.max(0, Math.min(100, baseStats[stat]));
-      }
+    // Apply bounds to stats with new maximums from constants
+    newStats.reloadTime = Math.max(
+      0,
+      Math.min(newStats.reloadTime, MAX_STATS.reloadTime)
+    );
+    newStats.fireRate = Math.max(
+      MAX_STATS.fireRate,
+      Math.min(2, newStats.fireRate)
+    ); // Minimum 50 RPS (1/50), maximum 0.5 RPS (2s)
+    newStats.damage = Math.max(1, newStats.damage);
+    newStats.range = Math.max(0, newStats.range);
+    newStats.magazineSize = Math.max(1, newStats.magazineSize);
+    newStats.pierce = Math.max(1, newStats.pierce);
+    newStats.projectileCount = Math.max(1, newStats.projectileCount);
+
+    console.log("Stats after calculation:", newStats);
+
+    // Convert to game weapon stats format
+    const gameStats: WeaponStats = {
+      name: "pistol",
+      damage: newStats.damage,
+      range: newStats.range,
+      fireRate: newStats.fireRate,
+      magazineSize: Math.floor(newStats.magazineSize),
+      reloadTime: newStats.reloadTime,
+      projectileCount: Math.max(1, Math.floor(newStats.projectileCount)), // 1:1 ratio of count
+      projectileSpeed: 10, // Fixed value, no longer upgradeable
+      reserveAmmo: Infinity, // Always infinite
+      customized: true,
+      parts: { ...partsToUse } as Required<Record<PartCategory, string>>,
+      pierce: newStats.pierce,
+      ammoCapacity: Math.floor(newStats.magazineSize),
+    };
+
+    console.log("Game stats:", gameStats);
+
+    return gameStats;
+  };
+
+  // Function to calculate the BASE stats including initial weapon stats
+  // and any currently equipped parts (for display/comparison purposes)
+  const calculateBaseStats = (): GunCustomizationStats => {
+    // Start with the initial weapon stats
+    const baseStats: GunCustomizationStats = {
+      damage: initialWeaponStats.damage,
+      range: initialWeaponStats.range,
+      fireRate: initialWeaponStats.fireRate,
+      magazineSize: initialWeaponStats.magazineSize,
+      reloadTime: initialWeaponStats.reloadTime,
+      pierce: initialWeaponStats.pierce || 1,
+      projectileCount: initialWeaponStats.projectileCount,
+    };
+
+    // Apply stats from all equipped parts
+    Object.values(equippedParts).forEach((partId) => {
+      if (!partId) return; // Skip empty slots
+
+      // Find the part in allParts
+      const part = gunParts.find((p) => p.id === partId);
+      if (!part) return; // Skip if part not found
+
+      // Apply each stat from the part
+      part.stats.forEach((stat) => {
+        const statName = stat.name as keyof GunCustomizationStats;
+        // Apply stat additively
+        baseStats[statName] += stat.value;
+      });
     });
+
+    // Enforce bounds on stats
+    baseStats.reloadTime = Math.max(0, baseStats.reloadTime);
+    baseStats.damage = Math.max(1, baseStats.damage);
+    baseStats.range = Math.max(1, baseStats.range);
+    baseStats.fireRate = Math.max(0.05, baseStats.fireRate);
+    baseStats.magazineSize = Math.max(1, baseStats.magazineSize);
+    baseStats.pierce = Math.max(1, baseStats.pierce || 0);
+    baseStats.projectileCount = Math.max(1, baseStats.projectileCount);
+
+    console.log("Base stats calculated:", baseStats);
 
     return baseStats;
   };
 
-  // Update gun stats when parts change
-  useEffect(() => {
-    setGunStats(calculateStats());
-  }, [equippedParts, gunParts]);
+  // Get final weapon stats by applying all equipped parts additively
+  const getFinalWeaponStats = (
+    partsToUse: Record<PartCategory, string> = equippedParts
+  ): WeaponStats => {
+    // Get base stats
+    const baseStats = calculateBaseStats();
 
-  // Update preview stats when hovering over a part
+    // Apply all equipped parts additively
+    let cumulativeGameStats = {
+      ...initialWeaponStats,
+      parts: { ...partsToUse } as Required<Record<PartCategory, string>>,
+      customized: true,
+    };
+
+    // Get all parts we need to apply
+    const partsToApply = Object.entries(partsToUse)
+      .map(([category, partId]) => {
+        return gunParts.find((p) => p.id === partId);
+      })
+      .filter((part): part is GunPart => part !== undefined);
+
+    // Create a stats object that will accumulate all changes
+    const cumulativeStats = { ...baseStats };
+
+    // Apply each part's stats additively
+    partsToApply.forEach((part) => {
+      part.stats.forEach((statItem) => {
+        let statKey = statItem.name;
+        let statValue = statItem.value;
+
+        if (statKey in cumulativeStats) {
+          // For reload time, apply direct value change (not percentage)
+          if (statKey === "reloadTime") {
+            // Simply add the value (negative values reduce reload time)
+            cumulativeStats[statKey as keyof typeof cumulativeStats] +=
+              statValue;
+          }
+          // All other stats are applied additively
+          else {
+            // For all stats, we add the value (negative for improvements where lower is better)
+            cumulativeStats[statKey as keyof typeof cumulativeStats] +=
+              statValue;
+          }
+        }
+      });
+    });
+
+    // Apply bounds
+    cumulativeStats.reloadTime = Math.max(0, cumulativeStats.reloadTime);
+    cumulativeStats.damage = Math.max(1, cumulativeStats.damage);
+    cumulativeStats.range = Math.max(0, cumulativeStats.range);
+    cumulativeStats.fireRate = Math.max(
+      0.1,
+      Math.min(2, cumulativeStats.fireRate)
+    );
+    cumulativeStats.magazineSize = Math.max(1, cumulativeStats.magazineSize);
+    cumulativeStats.pierce = Math.max(1, cumulativeStats.pierce);
+    cumulativeStats.projectileCount = Math.max(
+      1,
+      cumulativeStats.projectileCount
+    );
+
+    // Convert to game stats
+    const gameStats: WeaponStats = {
+      name: "pistol",
+      damage: cumulativeStats.damage,
+      range: cumulativeStats.range,
+      fireRate: cumulativeStats.fireRate,
+      magazineSize: Math.floor(cumulativeStats.magazineSize),
+      reloadTime: cumulativeStats.reloadTime,
+      projectileCount: Math.max(1, Math.floor(cumulativeStats.projectileCount)), // 1:1 ratio
+      projectileSpeed: 10, // Fixed value, no longer upgradeable
+      reserveAmmo: Infinity, // Always infinite
+      customized: true,
+      parts: { ...partsToUse } as Required<Record<PartCategory, string>>,
+      ammoCapacity: Math.floor(cumulativeStats.magazineSize),
+      pierce: cumulativeStats.pierce,
+    };
+
+    console.log("Game stats:", gameStats);
+
+    return gameStats;
+  };
+
+  // Calculate stats for preview/display
+  const calculateStats = (
+    previewPartId?: string | null
+  ): GunCustomizationStats => {
+    console.log("Calculating stats with preview part:", previewPartId);
+
+    // Start with the initial weapon stats
+    const stats: GunCustomizationStats = {
+      damage: initialWeaponStats.damage,
+      range: initialWeaponStats.range,
+      fireRate: initialWeaponStats.fireRate,
+      magazineSize: initialWeaponStats.magazineSize,
+      reloadTime: initialWeaponStats.reloadTime,
+      pierce: initialWeaponStats.pierce || 1,
+      projectileCount: initialWeaponStats.projectileCount,
+    };
+
+    console.log("Initial stats:", stats);
+
+    // Track the preview part category to avoid double-applying stats
+    let previewPartCategory: PartCategory | null = null;
+    let previewPart: GunPart | null = null;
+
+    if (previewPartId) {
+      previewPart = gunParts.find((p) => p.id === previewPartId) || null;
+      if (previewPart) {
+        previewPartCategory = previewPart.category;
+      }
+    }
+
+    // Apply stats from all equipped parts, except if we're previewing a part in the same category
+    Object.entries(equippedParts).forEach(([category, partId]) => {
+      // Skip if we're previewing a part in this category (to avoid double-counting)
+      if (previewPartCategory === category && previewPartId) {
+        console.log(
+          `Skipping equipped part in ${category} because we're previewing in this category`
+        );
+        return;
+      }
+
+      if (!partId) return; // Skip empty slots
+
+      // Find the part in allParts
+      const part = gunParts.find((p) => p.id === partId);
+      if (!part) return; // Skip if part not found
+
+      console.log(
+        `Applying equipped part ${part.name} (${part.id}) in ${category}`
+      );
+
+      // Apply each stat from the part
+      part.stats.forEach((stat) => {
+        const statName = stat.name as keyof GunCustomizationStats;
+        // Apply stat additively
+        stats[statName] += stat.value;
+        console.log(
+          `  Applied ${statName}: ${stat.value}, new value: ${stats[statName]}`
+        );
+      });
+    });
+
+    // Apply the preview part's stats if any
+    if (previewPart) {
+      console.log(
+        `Applying preview part ${previewPart.name} (${previewPart.id})`
+      );
+
+      previewPart.stats.forEach((stat) => {
+        const statName = stat.name as keyof GunCustomizationStats;
+        // Apply stat additively
+        stats[statName] += stat.value;
+        console.log(
+          `  Applied ${statName}: ${stat.value}, new value: ${stats[statName]}`
+        );
+      });
+    }
+
+    // Enforce bounds on stats
+    stats.reloadTime = Math.max(0, stats.reloadTime);
+    stats.damage = Math.max(1, stats.damage);
+    stats.range = Math.max(1, stats.range);
+    stats.fireRate = Math.max(0.05, stats.fireRate);
+    stats.magazineSize = Math.max(1, stats.magazineSize);
+    stats.pierce = Math.max(1, stats.pierce || 0);
+    stats.projectileCount = Math.max(1, stats.projectileCount);
+
+    console.log("Final calculated stats:", stats);
+
+    return stats;
+  };
+
+  // Update effect to use the shared function for preview
   useEffect(() => {
     if (hoveredPart) {
-      setPreviewStats(calculateStats(hoveredPart));
+      const hoveredPartObj = gunParts.find((p) => p.id === hoveredPart);
+      if (!hoveredPartObj) {
+        setPreviewStats(null);
+        return;
+      }
+
+      console.log(
+        `Calculating preview stats for hovered part: ${hoveredPartObj.name} (${hoveredPartObj.id})`
+      );
+
+      // Calculate current stats with all equipped parts
+      const currentStats = calculateStats();
+      console.log("Current base reload time:", currentStats.reloadTime);
+
+      // Create a temporary equipped parts record that includes the hovered part
+      const previewEquippedParts = { ...equippedParts };
+      previewEquippedParts[hoveredPartObj.category] = hoveredPartObj.id;
+
+      // Calculate preview stats with the hovered part
+      const previewGameStats = getFinalWeaponStats(previewEquippedParts);
+      console.log("Preview reload time:", previewGameStats.reloadTime);
+
+      // Convert preview game stats to the correct type for display
+      const previewUIStats: GunCustomizationStats = {
+        damage: previewGameStats.damage,
+        range: previewGameStats.range,
+        fireRate: previewGameStats.fireRate,
+        magazineSize: previewGameStats.magazineSize,
+        reloadTime: previewGameStats.reloadTime,
+        pierce: previewGameStats.pierce,
+        projectileCount: previewGameStats.projectileCount,
+      };
+
+      setPreviewStats(previewUIStats);
     } else {
       setPreviewStats(null);
     }
-  }, [hoveredPart, equippedParts, gunParts]);
+  }, [hoveredPart, gunParts, equippedParts]);
 
   // Initialize with custom stats if provided
   useEffect(() => {
@@ -694,14 +956,31 @@ export const GunCustomization: React.FC<GunCustomizationProps> = ({
     }
   }, [initialWeaponStats, gunParts]);
 
-  // Handle equipping a part
+  // Update gun stats when parts change
+  useEffect(() => {
+    setGunStats(calculateStats());
+  }, [equippedParts, gunParts]);
+
+  // Update equipPart to use the shared function
   const equipPart = (partId: string) => {
     const part = gunParts.find((p) => p.id === partId);
     if (part) {
-      setEquippedParts({
+      console.log("Equipping part:", part.name, "with stats:", part.stats);
+
+      // Update equipped parts
+      const updatedEquippedParts = {
         ...equippedParts,
         [part.category]: partId,
-      });
+      };
+
+      console.log("Updated equipped parts:", updatedEquippedParts);
+
+      // Calculate final game stats with the updated equipped parts
+      const finalGameStats = getFinalWeaponStats(updatedEquippedParts);
+      console.log("Final game stats after equipping:", finalGameStats);
+
+      // Save changes (no need to close modal here as parent component does that)
+      onSave(updatedEquippedParts, finalGameStats);
     }
   };
 
@@ -1376,85 +1655,180 @@ export const GunCustomization: React.FC<GunCustomizationProps> = ({
     );
   };
 
-  // Calculate stat changes from a part
-  const getStatChanges = (part: GunPart) => {
-    const changes: Array<{ name: string; value: number }> = [];
+  // Update getStatChanges function to display consistent values across both displays
+  const getStatChanges = (
+    part: GunPart
+  ): {
+    name: DisplayStatName;
+    value: number | string;
+    percentage: number;
+    isImprovement: boolean;
+  }[] => {
+    const statChanges: {
+      name: DisplayStatName;
+      value: number | string;
+      percentage: number;
+      isImprovement: boolean;
+    }[] = [];
 
     part.stats.forEach((stat) => {
-      // For display only, convert the internal stat name to a human-readable name
-      let displayName = stat.name.toString();
-      let value = stat.value;
+      let statKey = stat.name;
+      let displayName: DisplayStatName = stat.name;
+      let statValue = stat.value;
 
-      // Convert spread to accuracy for display
-      if (displayName === "spread") {
-        displayName = "accuracy";
-        value = -value; // Invert spread for accuracy (lower spread = higher accuracy)
+      // Format user-friendly display names
+      if (statKey === "fireRate") {
+        displayName = "fire rate";
+      } else if (statKey === "magazineSize") {
+        displayName = "magazine size";
+      } else if (statKey === "reloadTime") {
+        displayName = "reload time";
+      } else if (statKey === "projectileCount") {
+        displayName = "count";
+      } else if (statKey === "pierce") {
+        displayName = "pierce";
       }
 
-      // Convert reloadTime to reloadSpeed for display
-      if (displayName === "reloadTime") {
-        displayName = "reload speed";
-        value = -value; // Invert reload time (lower time = higher speed)
+      // Get the current base value for this stat from gunStats
+      // gunStats includes the effects of all currently equipped parts
+      let baseValue = 0;
+      let modifiedValue = 0;
+      let displayValue = 0;
+      let percentageChange = 0;
+      let isImprovement = false;
+
+      // Calculate the effect of applying this stat change
+      // Apply the exact same logic as in computeWeaponStats to ensure consistency
+      switch (statKey) {
+        case "damage":
+          baseValue = gunStats.damage;
+          modifiedValue = baseValue + statValue;
+          displayValue = modifiedValue - baseValue;
+          percentageChange = Math.round(
+            (Math.abs(displayValue) / baseValue) * 100
+          );
+          isImprovement = displayValue > 0;
+          break;
+        case "range":
+          baseValue = gunStats.range;
+          modifiedValue = baseValue + statValue;
+          displayValue = modifiedValue - baseValue;
+          percentageChange = Math.round(
+            (Math.abs(displayValue) / baseValue) * 100
+          );
+          isImprovement = displayValue > 0;
+          break;
+        case "fireRate":
+          baseValue = gunStats.fireRate;
+          // For fireRate, lower values mean faster firing, but display in RPS (inverse)
+          modifiedValue = baseValue + statValue; // Apply direct change
+
+          // Convert to RPS for display
+          const baseRPS = 1 / baseValue;
+          const modifiedRPS = 1 / modifiedValue;
+          displayValue = modifiedRPS - baseRPS; // Change in RPS
+          percentageChange = Math.round(
+            (Math.abs(displayValue) / baseRPS) * 100
+          );
+          isImprovement = displayValue > 0; // Higher RPS is better
+          // Format to 1 decimal place for display
+          displayValue = parseFloat(displayValue.toFixed(1));
+          break;
+        case "reloadTime":
+          baseValue = gunStats.reloadTime;
+          // For reload time, direct value change (negative is better)
+          modifiedValue = baseValue + statValue;
+
+          // Allow reload time to go down to 0
+          const boundedModifiedValue = Math.max(0, modifiedValue);
+          const actualChange = boundedModifiedValue - baseValue;
+
+          // If the change would be capped by bounds, adjust the display value accordingly
+          displayValue = actualChange !== 0 ? actualChange : statValue;
+
+          percentageChange = Math.round(
+            (Math.abs(displayValue) / baseValue) * 100
+          );
+          isImprovement = displayValue < 0;
+          // Format to 2 decimal places for display
+          displayValue = parseFloat(displayValue.toFixed(2));
+          break;
+        case "magazineSize":
+          baseValue = gunStats.magazineSize;
+          modifiedValue = baseValue + statValue;
+          displayValue = modifiedValue - baseValue;
+          percentageChange = Math.round(
+            (Math.abs(displayValue) / baseValue) * 100
+          );
+          isImprovement = displayValue > 0;
+          break;
+        case "pierce":
+          baseValue = gunStats.pierce;
+          modifiedValue = baseValue + statValue;
+          displayValue = modifiedValue - baseValue;
+          percentageChange = (displayValue / Math.max(0.01, baseValue)) * 100;
+          isImprovement = displayValue > 0;
+          break;
+        case "projectileCount":
+          baseValue = gunStats.projectileCount;
+          modifiedValue = baseValue + statValue;
+          displayValue = modifiedValue - baseValue;
+          percentageChange = Math.round(
+            (Math.abs(displayValue) / baseValue) * 100
+          );
+          isImprovement = displayValue > 0;
+          break;
       }
 
-      changes.push({
+      // Add the stat change to the list with proper formatting
+      // For numerical values, handle showing appropriate sign and units
+      let displayValueWithUnit: string | number = displayValue;
+
+      // Add appropriate units for each stat
+      if (statKey === "fireRate") {
+        displayValueWithUnit = `${
+          displayValue > 0 ? "+" : ""
+        }${displayValue} RPS`;
+      } else if (statKey === "reloadTime") {
+        displayValueWithUnit = `${displayValue}s`;
+      }
+
+      statChanges.push({
         name: displayName,
-        value: value,
+        value: displayValueWithUnit,
+        percentage: percentageChange,
+        isImprovement,
       });
     });
 
-    return changes;
+    return statChanges;
   };
 
-  // Render stat change for a part
-  const renderStatChange = (stat: { name: string; value: number }) => {
-    const isPositive = stat.value > 0;
-    // Round down to integer
-    const absValue = Math.floor(Math.abs(stat.value));
+  // Update renderStatChange function to use the improved values
+  const renderStatChange = (statChange: {
+    name: DisplayStatName;
+    value: number | string;
+    percentage: number;
+    isImprovement: boolean;
+  }) => {
+    const valueClass = statChange.isImprovement ? "stat-good" : "stat-bad";
+    const valuePrefix =
+      statChange.isImprovement && typeof statChange.value === "number"
+        ? "+"
+        : "";
 
-    // Calculate the base stat value for percentage calculation
-    let baseValue = 10; // Default base value
-
-    // Adjust base value based on stat type
-    switch (stat.name) {
-      case "damage":
-        baseValue = 10;
-        break;
-      case "accuracy":
-        baseValue = 70;
-        break;
-      case "range":
-        baseValue = 50;
-        break;
-      case "fireRate":
-        baseValue = 60;
-        break;
-      case "reload speed":
-        baseValue = 65;
-        break;
-      case "recoil":
-        baseValue = 40;
-        break;
-      case "magazineSize":
-        baseValue = 7;
-        break;
-    }
-
-    // Calculate percentage
-    const percentage = Math.round((absValue / baseValue) * 100);
-
-    // Format display value with percentage
-    const displayValue = isPositive
-      ? `+${absValue} (${percentage}%)`
-      : `-${absValue} (${percentage}%)`;
+    // For reload time, we don't need to show a + sign because negative is already shown
+    const formattedValue =
+      typeof statChange.value === "string"
+        ? statChange.value
+        : `${valuePrefix}${statChange.value}`;
 
     return (
-      <div
-        key={stat.name}
-        className={`stat ${isPositive ? "positive" : "negative"}`}
-      >
-        <span>{stat.name}:</span>
-        <span>{displayValue}</span>
+      <div key={statChange.name} className="stat">
+        <div className="stat-name">{statChange.name}:</div>
+        <div className={`stat-value ${valueClass}`}>
+          {formattedValue} ({statChange.percentage}%)
+        </div>
       </div>
     );
   };
@@ -1520,79 +1894,6 @@ export const GunCustomization: React.FC<GunCustomizationProps> = ({
     );
   };
 
-  // Get final weapon stats for saving
-  const getFinalWeaponStats = (): WeaponStats => {
-    // Calculate final stats based on equipped parts
-    let damage = 10; // Base damage
-    let fireRate = 0.5; // Base fire rate (in seconds between shots)
-    let magazineSize = 7; // Base magazine size
-    let reloadTime = 2.0; // Base reload time (in seconds)
-    let recoil = 5; // Base recoil
-    let projectileCount = 1; // Base projectile count
-    let spread = 0; // Base spread
-    let range = 300; // Base range
-
-    // Apply part bonuses
-    Object.entries(equippedParts).forEach(([category, partId]) => {
-      const part = gunParts.find((p) => p.id === partId);
-      if (part) {
-        part.stats.forEach((stat) => {
-          switch (stat.name) {
-            case "damage":
-              damage += stat.value;
-              break;
-            case "fireRate":
-              fireRate += stat.value;
-              break;
-            case "magazineSize":
-              magazineSize += stat.value;
-              break;
-            case "reloadTime":
-              reloadTime += stat.value;
-              break;
-            case "recoil":
-              recoil += stat.value;
-              break;
-            case "projectileCount":
-              projectileCount += stat.value;
-              break;
-            case "spread":
-              spread += stat.value;
-              break;
-            case "range":
-              range += stat.value;
-              break;
-          }
-        });
-      }
-    });
-
-    // Ensure no negative values
-    damage = Math.max(1, damage);
-    fireRate = Math.max(0.1, fireRate);
-    magazineSize = Math.max(1, Math.floor(magazineSize));
-    reloadTime = Math.max(0.5, reloadTime);
-    recoil = Math.max(1, recoil);
-    projectileCount = Math.max(1, Math.floor(projectileCount));
-    spread = Math.max(0, spread);
-    range = Math.max(100, range);
-
-    return {
-      name: "pistol", // Important to use 'pistol' as the name so it's recognized in the game
-      damage,
-      fireRate,
-      magazineSize,
-      reloadTime,
-      recoil,
-      projectileCount,
-      spread,
-      range,
-      reserveAmmo: magazineSize * 3, // Typical reserve ammo is 3x the magazine size
-      customized: true,
-      parts: equippedParts as Required<Record<PartCategory, string>>,
-    };
-  };
-
   // Add a function to regenerate parts
   const regenerateUpgrades = () => {
     // Keep the currently equipped parts
@@ -1616,7 +1917,7 @@ export const GunCustomization: React.FC<GunCustomizationProps> = ({
   // Add effect to handle ESC key to close modal
   useEffect(() => {
     const handleEscapeKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
+      if (e.key === "Escape" && !isLevelUpCustomization) {
         onCancel();
       }
     };
@@ -1628,163 +1929,158 @@ export const GunCustomization: React.FC<GunCustomizationProps> = ({
     return () => {
       window.removeEventListener("keydown", handleEscapeKey);
     };
-  }, [isOpen, onCancel]);
+  }, [isOpen, onCancel, isLevelUpCustomization]);
 
-  // Handle saving changes
-  const handleSave = () => {
-    onSave(equippedParts, getFinalWeaponStats());
-  };
-
-  // Filter parts to only show unequipped and non-standard parts
+  // Filter parts to only show unequipped parts
   const filteredGunParts = gunParts
-    .filter(
-      (part) =>
-        !part.id.startsWith("standard-") &&
-        !Object.values(equippedParts).includes(part.id)
-    )
+    .filter((part) => !Object.values(equippedParts).includes(part.id))
     .slice(0, 3);
 
   // Render weapon stats with numerical values
   const renderWeaponStats = () => {
     return (
-      <div className="stat-values">
+      <div className="stat-display">
+        <h2 className="header">Weapon Statistics</h2>
+
+        {/* Order and format matches HUD in GameLoopState.ts */}
         <div className="stat-row">
-          <span className="stat-label">Damage:</span>
+          <span className="stat-label">DMG:</span>
           <span className="stat-value">
-            {Math.floor(gunStats.damage)}
-            {previewStats && previewStats.damage !== gunStats.damage && (
-              <span
-                className={
-                  previewStats.damage > gunStats.damage
-                    ? "stat-increase"
-                    : "stat-decrease"
-                }
-              >
-                {" "}
-                ({previewStats.damage > gunStats.damage ? "+" : ""}
-                {Math.floor((previewStats.damage - gunStats.damage) * 100) /
-                  100}
-                )
-              </span>
+            {previewStats && previewStats.damage !== gunStats.damage ? (
+              <>
+                <span
+                  className={
+                    previewStats.damage > gunStats.damage
+                      ? "stat-increase"
+                      : "stat-decrease"
+                  }
+                >
+                  {Math.floor(previewStats.damage)} (
+                  {Math.round(
+                    (previewStats.damage / gunStats.damage - 1) * 100
+                  )}
+                  %)
+                </span>
+              </>
+            ) : (
+              Math.floor(gunStats.damage)
             )}
           </span>
         </div>
 
         <div className="stat-row">
-          <span className="stat-label">Accuracy:</span>
+          <span className="stat-label">RATE:</span>
           <span className="stat-value">
-            {Math.floor(gunStats.accuracy)}
-            {previewStats && previewStats.accuracy !== gunStats.accuracy && (
-              <span
-                className={
-                  previewStats.accuracy > gunStats.accuracy
-                    ? "stat-increase"
-                    : "stat-decrease"
-                }
-              >
-                {" "}
-                ({previewStats.accuracy > gunStats.accuracy ? "+" : ""}
-                {Math.floor((previewStats.accuracy - gunStats.accuracy) * 100) /
-                  100}
-                )
-              </span>
+            {previewStats && previewStats.fireRate !== gunStats.fireRate
+              ? (() => {
+                  const baseRPS = 1 / gunStats.fireRate;
+                  const previewRPS = 1 / previewStats.fireRate;
+                  const percentChange = Math.round(
+                    (previewRPS / baseRPS - 1) * 100
+                  );
+                  return (
+                    <>
+                      <span
+                        className={
+                          percentChange >= 0 ? "stat-increase" : "stat-decrease"
+                        }
+                      >
+                        {previewRPS.toFixed(1)} RPS ({percentChange}%)
+                      </span>
+                    </>
+                  );
+                })()
+              : `${(1 / gunStats.fireRate).toFixed(1)} RPS`}
+          </span>
+        </div>
+
+        <div className="stat-row">
+          <span className="stat-label">RANGE:</span>
+          <span className="stat-value">
+            {previewStats && previewStats.range !== gunStats.range ? (
+              <>
+                <span
+                  className={
+                    previewStats.range > gunStats.range
+                      ? "stat-increase"
+                      : "stat-decrease"
+                  }
+                >
+                  {Math.floor(previewStats.range)} (
+                  {Math.round(
+                    ((previewStats.range - gunStats.range) / gunStats.range) *
+                      100
+                  )}
+                  %)
+                </span>
+              </>
+            ) : (
+              Math.floor(gunStats.range)
             )}
           </span>
         </div>
 
         <div className="stat-row">
-          <span className="stat-label">Range:</span>
+          <span className="stat-label">PIERCE:</span>
           <span className="stat-value">
-            {Math.floor(gunStats.range)}
-            {previewStats && previewStats.range !== gunStats.range && (
-              <span
-                className={
-                  previewStats.range > gunStats.range
-                    ? "stat-increase"
-                    : "stat-decrease"
-                }
-              >
-                {" "}
-                ({previewStats.range > gunStats.range ? "+" : ""}
-                {Math.floor((previewStats.range - gunStats.range) * 100) / 100})
-              </span>
+            {previewStats && previewStats.pierce !== gunStats.pierce ? (
+              <>
+                <span
+                  className={
+                    previewStats.pierce > gunStats.pierce
+                      ? "stat-increase"
+                      : "stat-decrease"
+                  }
+                >
+                  {Math.floor(previewStats.pierce)} (
+                  {Math.round(
+                    ((previewStats.pierce - gunStats.pierce) /
+                      Math.max(0.01, gunStats.pierce)) *
+                      100
+                  )}
+                  %)
+                </span>
+              </>
+            ) : (
+              Math.floor(gunStats.pierce)
             )}
           </span>
         </div>
 
         <div className="stat-row">
-          <span className="stat-label">Fire Rate:</span>
+          <span className="stat-label">SIZE:</span>
           <span className="stat-value">
-            {Math.floor(gunStats.fireRate)}
-            {previewStats && previewStats.fireRate !== gunStats.fireRate && (
-              <span
-                className={
-                  previewStats.fireRate > gunStats.fireRate
-                    ? "stat-increase"
-                    : "stat-decrease"
-                }
-              >
-                {" "}
-                ({previewStats.fireRate > gunStats.fireRate ? "+" : ""}
-                {Math.floor((previewStats.fireRate - gunStats.fireRate) * 100) /
-                  100}
-                )
-              </span>
-            )}
-          </span>
-        </div>
-
-        <div className="stat-row">
-          <span className="stat-label">Reload Speed:</span>
-          <span className="stat-value">
-            {Math.floor(gunStats.reloadSpeed)}
-            {previewStats && previewStats.reloadSpeed !== gunStats.reloadSpeed && (
-              <span
-                className={
-                  previewStats.reloadSpeed > gunStats.reloadSpeed
-                    ? "stat-increase"
-                    : "stat-decrease"
-                }
-              >
-                {" "}
-                ({previewStats.reloadSpeed > gunStats.reloadSpeed ? "+" : ""}
-                {Math.floor(
-                  (previewStats.reloadSpeed - gunStats.reloadSpeed) * 100
-                ) / 100}
-                )
-              </span>
-            )}
-          </span>
-        </div>
-
-        <div className="stat-row">
-          <span className="stat-label">Recoil Control:</span>
-          <span className="stat-value">
-            {Math.floor(gunStats.recoil)}
-            {previewStats && previewStats.recoil !== gunStats.recoil && (
-              <span
-                className={
-                  previewStats.recoil > gunStats.recoil
-                    ? "stat-increase"
-                    : "stat-decrease"
-                }
-              >
-                {" "}
-                ({previewStats.recoil > gunStats.recoil ? "+" : ""}
-                {Math.floor((previewStats.recoil - gunStats.recoil) * 100) /
-                  100}
-                )
-              </span>
-            )}
-          </span>
-        </div>
-
-        <div className="stat-row">
-          <span className="stat-label">Magazine Size:</span>
-          <span className="stat-value">
-            {Math.floor(gunStats.magazineSize)}
             {previewStats &&
-              previewStats.magazineSize !== gunStats.magazineSize && (
+            previewStats.projectileCount !== gunStats.projectileCount ? (
+              <>
+                <span
+                  className={
+                    previewStats.projectileCount > gunStats.projectileCount
+                      ? "stat-increase"
+                      : "stat-decrease"
+                  }
+                >
+                  {Math.floor(previewStats.projectileCount)} (
+                  {Math.round(
+                    (previewStats.projectileCount / gunStats.projectileCount -
+                      1) *
+                      100
+                  )}
+                  %)
+                </span>
+              </>
+            ) : (
+              Math.floor(gunStats.projectileCount)
+            )}
+          </span>
+        </div>
+
+        <div className="stat-row">
+          <span className="stat-label">MAG:</span>
+          <span className="stat-value">
+            {previewStats &&
+            previewStats.magazineSize !== gunStats.magazineSize ? (
+              <>
                 <span
                   className={
                     previewStats.magazineSize > gunStats.magazineSize
@@ -1792,15 +2088,42 @@ export const GunCustomization: React.FC<GunCustomizationProps> = ({
                       : "stat-decrease"
                   }
                 >
-                  {" "}
-                  (
-                  {previewStats.magazineSize > gunStats.magazineSize ? "+" : ""}
-                  {Math.floor(
-                    (previewStats.magazineSize - gunStats.magazineSize) * 100
-                  ) / 100}
-                  )
+                  {Math.floor(previewStats.magazineSize)} (
+                  {Math.round(
+                    (previewStats.magazineSize / gunStats.magazineSize - 1) *
+                      100
+                  )}
+                  %)
                 </span>
-              )}
+              </>
+            ) : (
+              Math.floor(gunStats.magazineSize)
+            )}
+          </span>
+        </div>
+
+        <div className="stat-row">
+          <span className="stat-label">RELOAD:</span>
+          <span className="stat-value">
+            {previewStats && previewStats.reloadTime !== gunStats.reloadTime
+              ? (() => {
+                  const percentChange = Math.round(
+                    (previewStats.reloadTime / gunStats.reloadTime - 1) * 100
+                  );
+                  // For reload time, negative percentage is better (faster reload)
+                  return (
+                    <>
+                      <span
+                        className={
+                          percentChange <= 0 ? "stat-increase" : "stat-decrease"
+                        }
+                      >
+                        {previewStats.reloadTime.toFixed(1)}s ({percentChange}%)
+                      </span>
+                    </>
+                  );
+                })()
+              : `${gunStats.reloadTime.toFixed(1)}s`}
           </span>
         </div>
       </div>
@@ -1809,13 +2132,24 @@ export const GunCustomization: React.FC<GunCustomizationProps> = ({
 
   // Render a part item
   const renderPartItem = (part: GunPart, index: number) => {
+    const statChanges = getStatChanges(part);
+    console.log(
+      `Rendering part ${part.name} with ${statChanges.length} stat changes`
+    );
+
     return (
       <div
         key={part.id}
         className="part-item"
         onClick={() => equipPart(part.id)}
-        onMouseEnter={() => setHoveredPart(part.id)}
-        onMouseLeave={() => setHoveredPart(null)}
+        onMouseEnter={() => {
+          console.log("Mouse entering part:", part.id);
+          setHoveredPart(part.id);
+        }}
+        onMouseLeave={() => {
+          console.log("Mouse leaving part:", part.id);
+          setHoveredPart(null);
+        }}
       >
         <div className="part-name">{part.name}</div>
         <div className="part-category">
@@ -1823,17 +2157,68 @@ export const GunCustomization: React.FC<GunCustomizationProps> = ({
         </div>
         <div className="part-description">{part.description}</div>
         <div className="part-stats">
-          {getStatChanges(part).map(renderStatChange)}
+          {statChanges.map((stat, idx) => (
+            <div key={`${part.id}-${idx}`} className="stat">
+              <div className="stat-name">{stat.name}:</div>
+              <div
+                className={`stat-value ${
+                  stat.isImprovement ? "stat-good" : "stat-bad"
+                }`}
+              >
+                {typeof stat.value === "string"
+                  ? stat.value
+                  : `${stat.isImprovement && stat.value > 0 ? "+" : ""}${
+                      stat.value
+                    }`}{" "}
+                ({stat.percentage}%)
+              </div>
+            </div>
+          ))}
         </div>
       </div>
     );
+  };
+
+  // Preview a part - but don't apply it
+  const previewPart = (part: GunPart | null) => {
+    if (!part) {
+      setPreviewStats(null);
+      return;
+    }
+
+    // Calculate potential stats with this part
+    const potentialStats = { ...gunStats };
+
+    // Apply part stats
+    part.stats.forEach((stat) => {
+      // Ensure the stat property exists before adding to it
+      if (potentialStats[stat.name] === undefined) {
+        potentialStats[stat.name] = 0;
+      }
+      potentialStats[stat.name] += stat.value;
+    });
+
+    // Make sure pierce is valid
+    potentialStats.pierce = potentialStats.pierce || 1;
+
+    // Calculate preview stats with the potential change
+    const previewGameStats = computeWeaponStats(potentialStats, {
+      ...equippedParts,
+      [part.category]: part.id,
+    });
+
+    setPreviewStats(potentialStats);
+    setPreviewGameStats(previewGameStats);
   };
 
   // Only render if modal is open
   if (!isOpen) return null;
 
   return (
-    <div className="modal-overlay" onClick={onCancel}>
+    <div
+      className="modal-overlay"
+      onClick={isLevelUpCustomization ? (e) => e.stopPropagation() : onCancel}
+    >
       <div
         className={`gun-customization ${
           isLevelUpCustomization ? "level-up-customization" : ""
@@ -1861,13 +2246,9 @@ export const GunCustomization: React.FC<GunCustomizationProps> = ({
           </div>
         </div>
 
-        <div className="action-buttons">
-          <button className="cancel-button" onClick={onCancel}>
-            {isLevelUpCustomization ? "Skip Upgrade" : "Cancel"}
-          </button>
-          <button className="save-button" onClick={handleSave}>
-            {isLevelUpCustomization ? "Apply Upgrade" : "Save Changes"}
-          </button>
+        {/* Add user instructions */}
+        <div className="upgrade-instructions">
+          Click on a weapon part to apply the upgrade immediately
         </div>
       </div>
     </div>

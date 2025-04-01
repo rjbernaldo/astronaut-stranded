@@ -1,5 +1,14 @@
-import { CentralGameState, ActionType } from "../state/GameState";
+import {
+  CentralGameState,
+  ActionType,
+  GameStateData,
+  Notification,
+} from "../state/GameState";
 import { Position, WeaponStats } from "../types";
+import { Enemy } from "../game/Enemy";
+
+// Constants
+const DIFFICULTY_SCALING_INTERVAL = 60; // Seconds between difficulty increases
 
 /**
  * A new implementation of GameLoop that uses a centralized state management approach
@@ -8,6 +17,7 @@ export class GameLoopState {
   private lastTime: number = 0;
   private animationFrameId: number | null = null;
   private gameState: CentralGameState;
+  private onLevelUpCallback: (() => void) | null = null;
 
   constructor(
     canvas: HTMLCanvasElement,
@@ -16,6 +26,10 @@ export class GameLoopState {
   ) {
     // Initialize central game state
     this.gameState = new CentralGameState(canvas, seed, initialWeaponStats);
+
+    // Enable auto-aim permanently
+    const state = this.gameState.getState();
+    state.autoAimEnabled = true;
 
     // Set up event listeners
     this.setupEventListeners();
@@ -35,11 +49,6 @@ export class GameLoopState {
       // Reload on 'r' press
       if (e.key.toLowerCase() === "r") {
         this.gameState.reload();
-      }
-
-      // Toggle auto-aim with 't' key
-      if (e.key.toLowerCase() === "t") {
-        this.gameState.toggleAutoAim();
       }
 
       // Weapon switching
@@ -164,6 +173,41 @@ export class GameLoopState {
   }
 
   /**
+   * Get the current game state
+   */
+  getState() {
+    return this.gameState.getState();
+  }
+
+  /**
+   * Set callback to be called when player levels up
+   */
+  setOnLevelUpCallback(callback: () => void): void {
+    this.onLevelUpCallback = callback;
+
+    // Keep track of the last level we saw
+    let lastLevel = 1;
+
+    // Setup a function to check if the player has leveled up
+    this.gameState.subscribe("*", (state: any) => {
+      // Only process if we have a callback
+      if (!this.onLevelUpCallback) return;
+
+      // Check if state has UI data
+      if (state && state.ui) {
+        // Check if player level has increased since we last checked
+        if (state.ui.playerLevel > lastLevel) {
+          // Update the last level we saw
+          lastLevel = state.ui.playerLevel;
+
+          // Call the level up callback
+          this.onLevelUpCallback();
+        }
+      }
+    });
+  }
+
+  /**
    * Main game loop
    */
   private loop(timestamp: number): void {
@@ -196,13 +240,45 @@ export class GameLoopState {
 
     if (state.ui.isGameOver) return;
 
+    // Check if player is dead
+    if (state.player.health <= 0) {
+      state.ui.isGameOver = true;
+
+      // Record final stats for the death screen
+      state.ui.finalStats = {
+        time: state.ui.gameTime,
+        score: state.ui.score,
+        wave: state.ui.waveNumber,
+        level: state.ui.playerLevel,
+        kills: state.ui.kills || 0,
+
+        // Track stats over time for the graph
+        history: [
+          ...(state.ui.statsHistory || []),
+          {
+            time: state.ui.gameTime,
+            health: 0, // Final health is 0
+            score: state.ui.score,
+            kills: state.ui.kills || 0,
+            level: state.ui.playerLevel,
+          },
+        ],
+      };
+
+      // Render game over screen
+      this.renderGameOver();
+      return;
+    }
+
     // Handle player input
     this.handleInput(deltaTime, timestamp);
 
-    // Auto-aim and shoot at nearby enemies
-    this.gameState.autoAimAndShoot(timestamp);
+    // Auto-aim and shoot
+    if (state.autoAimEnabled) {
+      this.gameState.autoAimAndShoot(timestamp);
+    }
 
-    // Update all entities (player, projectiles, enemies)
+    // Update all entities
     this.gameState.updateEntities(deltaTime, timestamp);
 
     // Check if player is on hazard tile
@@ -213,7 +289,6 @@ export class GameLoopState {
     }
 
     // Spawn new enemies
-    // TODO: Move this to the state class
     this.spawnEnemies(timestamp);
 
     // Auto-explore map around player
@@ -222,6 +297,22 @@ export class GameLoopState {
       state.player.position.y,
       state.player.lightRadius
     );
+
+    // Record stats for history (every 5 seconds)
+    if (!state.ui.statsHistory) {
+      state.ui.statsHistory = [];
+    }
+
+    const lastRecord = state.ui.statsHistory[state.ui.statsHistory.length - 1];
+    if (!lastRecord || state.ui.gameTime - lastRecord.time >= 5) {
+      state.ui.statsHistory.push({
+        time: state.ui.gameTime,
+        health: state.player.health,
+        score: state.ui.score,
+        kills: state.ui.kills || 0,
+        level: state.ui.playerLevel,
+      });
+    }
   }
 
   /**
@@ -282,8 +373,6 @@ export class GameLoopState {
     const state = this.gameState.getState();
     const canvas = this.gameState.getCanvas();
 
-    // TODO: Move this to the central state class
-
     // Check if it's time to spawn a new wave
     if (state.ui.waveNumber > 1) {
       if (timestamp - state.lastEnemySpawnTime < state.enemySpawnInterval)
@@ -295,19 +384,134 @@ export class GameLoopState {
     // Increase difficulty over time
     state.ui.waveNumber++;
     state.enemySpawnCount = Math.min(
-      5 + Math.floor(state.ui.waveNumber / 2),
-      20
+      4 + Math.floor(state.ui.waveNumber / 2),
+      15
     );
 
     // Decrease spawn interval over time (more frequent spawns)
-    state.enemySpawnInterval = Math.max(5000 - state.ui.waveNumber * 200, 2000);
+    state.enemySpawnInterval = Math.max(6250 - state.ui.waveNumber * 200, 2500);
 
     // Calculate the view range (slightly larger than canvas)
     const viewRangeX = canvas.width * 0.5;
     const viewRangeY = canvas.height * 0.5;
 
-    // Implement enemy spawning logic...
-    // (Copied from original GameLoop for now)
+    // Generate enemies for this wave
+    for (let i = 0; i < state.enemySpawnCount; i++) {
+      // Find a valid spawn position outside the player's view
+      let spawnX: number = 0;
+      let spawnY: number = 0;
+      let validPosition = false;
+      let attempts = 0;
+
+      // Try to find a valid spawn position
+      while (!validPosition && attempts < 10) {
+        attempts++;
+
+        // Determine spawn direction (from which edge)
+        const spawnDirection = Math.floor(Math.random() * 4); // 0: top, 1: right, 2: bottom, 3: left
+
+        // Calculate base spawn position depending on direction
+        switch (spawnDirection) {
+          case 0: // Top
+            spawnX =
+              state.player.position.x + (Math.random() * 2 - 1) * viewRangeX;
+            spawnY = state.player.position.y - viewRangeY - Math.random() * 200;
+            break;
+          case 1: // Right
+            spawnX = state.player.position.x + viewRangeX + Math.random() * 200;
+            spawnY =
+              state.player.position.y + (Math.random() * 2 - 1) * viewRangeY;
+            break;
+          case 2: // Bottom
+            spawnX =
+              state.player.position.x + (Math.random() * 2 - 1) * viewRangeX;
+            spawnY = state.player.position.y + viewRangeY + Math.random() * 200;
+            break;
+          case 3: // Left
+            spawnX = state.player.position.x - viewRangeX - Math.random() * 200;
+            spawnY =
+              state.player.position.y + (Math.random() * 2 - 1) * viewRangeY;
+            break;
+        }
+
+        // Check if the position is valid (on a walkable tile)
+        if (state.map.isTileWalkable(spawnX, spawnY)) {
+          // Ensure minimum distance from player
+          const distX = Math.abs(spawnX - state.player.position.x);
+          const distY = Math.abs(spawnY - state.player.position.y);
+          if (Math.sqrt(distX * distX + distY * distY) > 300) {
+            validPosition = true;
+          }
+        }
+      }
+
+      if (validPosition) {
+        // Calculate enemy level based on game difficulty
+        const enemyLevel = Math.max(
+          1,
+          Math.floor(state.ui.difficultyLevel * 0.5)
+        );
+
+        // Determine enemy type based on difficulty and random chance
+        let enemyType: "Scout" | "Brute" | "Spitter" = "Scout";
+
+        const roll = Math.random() * 100;
+
+        if (state.ui.difficultyLevel >= 3) {
+          if (roll < 10 * state.ui.difficultyLevel) {
+            // Higher chance of brutes as difficulty increases
+            enemyType = "Brute";
+          } else if (roll < 20 * state.ui.difficultyLevel) {
+            // Higher chance of spitters as difficulty increases
+            enemyType = "Spitter";
+          }
+        }
+
+        // Create enemy stats
+        const stats: any = {
+          health: 0,
+          speed: 0,
+          attackRange: 0,
+          attackDamage: 0,
+          attackSpeed: 0,
+          type: enemyType,
+          level: enemyLevel,
+        };
+
+        // Adjust stats based on type
+        switch (enemyType) {
+          case "Scout":
+            stats.health = 30 * enemyLevel;
+            stats.speed = 64 + enemyLevel * 4; // Reduced by 20% from 80 + enemyLevel * 5
+            stats.attackRange = 20;
+            stats.attackDamage = 10 + enemyLevel * 2;
+            stats.attackSpeed = 1;
+            break;
+          case "Brute":
+            stats.health = 70 * enemyLevel;
+            stats.speed = 32 + enemyLevel * 1.6; // Reduced by 20% from 40 + enemyLevel * 2
+            stats.attackRange = 25;
+            stats.attackDamage = 20 + enemyLevel * 4;
+            stats.attackSpeed = 2;
+            break;
+          case "Spitter":
+            stats.health = 40 * enemyLevel;
+            stats.speed = 48 + enemyLevel * 2.4; // Reduced by 20% from 60 + enemyLevel * 3
+            stats.attackRange = 150;
+            stats.attackDamage = 8 + enemyLevel * 1.5;
+            stats.attackSpeed = 1.5;
+            break;
+        }
+
+        // Create and add enemy
+        const enemy = new Enemy(
+          { x: spawnX, y: spawnY },
+          stats,
+          state.player.position
+        );
+        state.enemies.push(enemy);
+      }
+    }
   }
 
   /**
@@ -344,6 +548,9 @@ export class GameLoopState {
 
     // Render player
     this.renderPlayer();
+
+    // Render minimap
+    this.renderMiniMap(state, ctx, canvas);
 
     // Render HUD
     this.renderHUD();
@@ -395,6 +602,151 @@ export class GameLoopState {
   }
 
   /**
+   * Render the minimap
+   */
+  private renderMiniMap(
+    state: GameStateData,
+    ctx: CanvasRenderingContext2D,
+    canvas: HTMLCanvasElement
+  ): void {
+    // Minimap constants
+    const mapSize = 150;
+    const padding = 20;
+    const borderWidth = 2;
+    // Move minimap to top right instead of bottom right
+    const mapX = canvas.width - mapSize - padding;
+    const mapY = padding;
+
+    // Save context state
+    ctx.save();
+
+    // Create clipping region for the minimap
+    ctx.beginPath();
+    ctx.rect(mapX, mapY, mapSize, mapSize);
+    ctx.clip();
+
+    // Calculate minimap scale (how much to zoom in/out)
+    const mapScale = 0.1;
+
+    // This keeps the player centered in the minimap
+    const centerX = mapX + mapSize / 2 - state.player.position.x * mapScale;
+    const centerY = mapY + mapSize / 2 - state.player.position.y * mapScale;
+
+    // Draw minimap background
+    ctx.fillStyle = "rgba(0, 0, 0, 0.5)";
+    ctx.fillRect(mapX, mapY, mapSize, mapSize);
+
+    // Draw map tiles on minimap
+    const tileSize = state.map.tileSize * mapScale;
+    const startTileX = Math.floor(
+      (state.player.position.x - mapSize / mapScale / 2) / state.map.tileSize
+    );
+    const startTileY = Math.floor(
+      (state.player.position.y - mapSize / mapScale / 2) / state.map.tileSize
+    );
+    const endTileX =
+      startTileX + Math.ceil(mapSize / mapScale / state.map.tileSize) + 1;
+    const endTileY =
+      startTileY + Math.ceil(mapSize / mapScale / state.map.tileSize) + 1;
+
+    for (let x = startTileX; x < endTileX; x++) {
+      for (let y = startTileY; y < endTileY; y++) {
+        if (x >= 0 && x < state.map.width && y >= 0 && y < state.map.height) {
+          const tile = state.map.tiles[y][x]; // Direct array access since we have bounds checks
+
+          if (tile.explored) {
+            // Draw explored tiles
+            let tileColor;
+
+            switch (tile.type) {
+              case "floor":
+                tileColor = "#444";
+                break;
+              case "wall":
+                tileColor = "#888";
+                break;
+              case "hazard":
+                tileColor = "#A00";
+                break;
+              case "exit":
+                tileColor = "#44F";
+                break;
+              default:
+                tileColor = "#000";
+            }
+
+            ctx.fillStyle = tileColor;
+            ctx.fillRect(
+              centerX + x * state.map.tileSize * mapScale,
+              centerY + y * state.map.tileSize * mapScale,
+              tileSize,
+              tileSize
+            );
+          }
+        }
+      }
+    }
+
+    // Draw enemies on minimap
+    for (const enemy of state.enemies) {
+      if (!enemy.active) continue;
+
+      // Only draw enemies that are visible on minimap
+      const enemyScreenX = centerX + enemy.position.x * mapScale;
+      const enemyScreenY = centerY + enemy.position.y * mapScale;
+
+      if (
+        enemyScreenX >= mapX &&
+        enemyScreenX <= mapX + mapSize &&
+        enemyScreenY >= mapY &&
+        enemyScreenY <= mapY + mapSize
+      ) {
+        // Draw enemy dot - color based on enemy type
+        let enemyColor;
+        switch (enemy.type) {
+          case "Brute":
+            enemyColor = "#F00"; // Red for brutes
+            break;
+          case "Spitter":
+            enemyColor = "#FF0"; // Yellow for spitters
+            break;
+          default:
+            enemyColor = "#F80"; // Orange for scouts
+        }
+
+        ctx.fillStyle = enemyColor;
+        ctx.beginPath();
+        ctx.arc(enemyScreenX, enemyScreenY, 2, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+
+    // Draw player on minimap
+    ctx.fillStyle = "#0AF"; // Bright blue for player
+    ctx.beginPath();
+    ctx.arc(mapX + mapSize / 2, mapY + mapSize / 2, 3, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Draw player direction
+    const dirX = Math.cos((state.player.rotation * Math.PI) / 180) * 6;
+    const dirY = Math.sin((state.player.rotation * Math.PI) / 180) * 6;
+    ctx.strokeStyle = "#0AF";
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(mapX + mapSize / 2, mapY + mapSize / 2);
+    ctx.lineTo(mapX + mapSize / 2 + dirX, mapY + mapSize / 2 + dirY);
+    ctx.stroke();
+
+    // Draw minimap border
+    ctx.strokeStyle = "#FFF";
+    ctx.lineWidth = borderWidth;
+    ctx.strokeRect(mapX, mapY, mapSize, mapSize);
+
+    // Restore context state
+    ctx.restore();
+  }
+
+  /**
    * Render the HUD
    */
   private renderHUD(): void {
@@ -429,32 +781,34 @@ export class GameLoopState {
       padding + 15
     );
 
-    // Draw difficulty information (left side)
-    const diffBarY = padding + barHeight + 10;
+    // Draw Wave progress bar (replacing "difficulty")
+    const waveBarY = padding + barHeight + 10;
     ctx.fillStyle = "#333333";
-    ctx.fillRect(padding, diffBarY, barWidth, barHeight);
+    ctx.fillRect(padding, waveBarY, barWidth, barHeight);
 
-    // Calculate time progress for next level
-    const timeProgress = 1 - state.ui.nextLevelTime / 60; // Using the constant directly
+    // Calculate time progress for next wave
+    const waveProgress =
+      1 - state.ui.nextLevelTime / DIFFICULTY_SCALING_INTERVAL;
 
-    // Draw difficulty progress bar
-    ctx.fillStyle = "#8844FF";
-    ctx.fillRect(padding, diffBarY, barWidth * timeProgress, barHeight);
+    // Draw wave progress bar
+    ctx.fillStyle = "#FF6600"; // Orange color for wave
+    ctx.fillRect(padding, waveBarY, barWidth * waveProgress, barHeight);
     ctx.strokeStyle = "#FFFFFF";
-    ctx.strokeRect(padding, diffBarY, barWidth, barHeight);
+    ctx.strokeRect(padding, waveBarY, barWidth, barHeight);
 
-    // Draw difficulty text
+    // Draw wave text
     ctx.fillStyle = "#FFFFFF";
     ctx.font = "16px monospace";
     ctx.textAlign = "left";
+    const timeUntilNextWave = Math.max(0, Math.ceil(state.ui.nextLevelTime));
     ctx.fillText(
-      `Difficulty: ${state.ui.difficultyLevel}`,
+      `Wave ${state.ui.waveNumber} (Next: ${timeUntilNextWave}s)`,
       padding + 10,
-      diffBarY + 15
+      waveBarY + 15
     );
 
     // Draw player level progress bar
-    const levelBarY = diffBarY + barHeight + 10;
+    const levelBarY = waveBarY + barHeight + 10;
     ctx.fillStyle = "#333333";
     ctx.fillRect(padding, levelBarY, barWidth, barHeight);
 
@@ -480,7 +834,6 @@ export class GameLoopState {
     // Draw time info
     const minutes = Math.floor(state.ui.gameTime / 60);
     const seconds = Math.floor(state.ui.gameTime % 60);
-    const timeNextLevel = Math.max(0, Math.ceil(state.ui.nextLevelTime));
 
     ctx.fillStyle = "#FFFFFF";
     ctx.font = "16px monospace";
@@ -491,10 +844,11 @@ export class GameLoopState {
       levelBarY + barHeight + 20
     );
 
+    // Draw score display
     ctx.fillText(
-      `Next level: ${timeNextLevel}s`,
+      `Score: ${state.ui.score}`,
       padding,
-      levelBarY + barHeight + 40
+      levelBarY + barHeight + 45
     );
 
     // Draw ammo counter
@@ -581,9 +935,8 @@ export class GameLoopState {
         const bulletX = startX - i * (bulletWidth + bulletSpacing);
         const bulletY = startY;
 
-        // Check if this bullet is being ejected
+        // Check if this bullet is being ejected (for backward compatibility)
         let isEjecting = false;
-        let ejectionProgress = 0;
 
         if (i === currentAmmo && ejectedBullets.length > 0) {
           // Find the most recent ejected bullet for this weapon
@@ -592,62 +945,7 @@ export class GameLoopState {
           );
           if (ejectedBullet) {
             isEjecting = true;
-            ejectionProgress = ejectedBullet.progress;
           }
-        }
-
-        if (isEjecting) {
-          // Get the ejected bullet
-          const ejectedBullet = ejectedBullets.find(
-            (b) => b.weaponName === weaponName
-          );
-          if (!ejectedBullet) continue;
-
-          // Animation parameters
-          const progress = ejectedBullet.progress;
-          const rotation = ejectedBullet.rotation;
-          const initialVelocity = ejectedBullet.initialVelocity;
-
-          // Calculate arc trajectory
-          // Initial upward movement with gravity effect
-          const gravity = 8; // Gravity effect
-          const timeSquared = progress * progress;
-
-          // Calculate position based on initial velocity and gravity
-          const xOffset = initialVelocity.x * progress * 50; // Scale for visual effect
-          const yOffset =
-            (initialVelocity.y * progress - 0.5 * gravity * timeSquared) * 50; // Gravity formula
-
-          // Calculate opacity (fade out towards the end of animation)
-          const fadeOpacity = Math.max(0, 1 - progress * 1.5);
-
-          // Save context for rotation
-          ctx.save();
-
-          // Translate to bullet position with offset
-          ctx.translate(
-            bulletX + bulletWidth / 2 + xOffset,
-            bulletY + bulletHeight / 2 + yOffset
-          );
-
-          // Rotate the bullet
-          ctx.rotate((rotation * Math.PI) / 180);
-
-          // Draw ejected bullet with animation (centered at origin after translation)
-          ctx.globalAlpha = fadeOpacity;
-          ctx.fillStyle = "#FFD700";
-          ctx.fillRect(
-            -bulletWidth / 2,
-            -bulletHeight / 2,
-            bulletWidth,
-            bulletHeight
-          );
-          ctx.fillStyle = "#FFAA00";
-          ctx.fillRect(-bulletWidth / 2, -bulletHeight / 2, bulletWidth, 6);
-
-          // Restore context
-          ctx.globalAlpha = 1;
-          ctx.restore();
         }
 
         // Only draw the bullet in place if it's not being ejected or it's not the current bullet
@@ -661,33 +959,75 @@ export class GameLoopState {
           ctx.fillRect(bulletX, bulletY, bulletWidth, 6);
         }
       }
+
+      // Display weapon statistics in bottom left
+      if (state.player.activeWeapon) {
+        const stats = state.player.activeWeapon.stats;
+        const leftPadding = 20;
+        const bottomPadding = 20;
+        const lineHeight = 20;
+
+        ctx.fillStyle = "#FFFFFF";
+        ctx.font = "16px monospace";
+        ctx.textAlign = "left";
+
+        // Display all weapon stats
+        ctx.fillText(
+          `WEAPON: ${stats.name.toUpperCase()}`,
+          leftPadding,
+          canvas.height - bottomPadding - lineHeight * 7
+        );
+
+        // Display damage
+        ctx.fillText(
+          `DMG: ${Math.floor(stats.damage)}`,
+          leftPadding,
+          canvas.height - bottomPadding - lineHeight * 6
+        );
+
+        // Display fire rate (rounds per second)
+        ctx.fillText(
+          `RATE: ${(1 / stats.fireRate).toFixed(1)} RPS`,
+          leftPadding,
+          canvas.height - bottomPadding - lineHeight * 5
+        );
+
+        // Display range
+        ctx.fillText(
+          `RANGE: ${Math.floor(stats.range)}`,
+          leftPadding,
+          canvas.height - bottomPadding - lineHeight * 4
+        );
+
+        // Display pierce (formerly knockback)
+        ctx.fillText(
+          `PIERCE: ${Math.floor(stats.pierce)}`,
+          leftPadding,
+          canvas.height - bottomPadding - lineHeight * 3
+        );
+
+        // Display projectile size
+        ctx.fillText(
+          `SIZE: ${Math.floor(stats.projectileCount)}`,
+          leftPadding,
+          canvas.height - bottomPadding - lineHeight * 2
+        );
+
+        // Magazine size
+        ctx.fillText(
+          `MAG: ${Math.floor(stats.magazineSize)}`,
+          leftPadding,
+          canvas.height - bottomPadding - lineHeight
+        );
+
+        // Reload time
+        ctx.fillText(
+          `RELOAD: ${stats.reloadTime.toFixed(1)}s`,
+          leftPadding,
+          canvas.height - bottomPadding
+        );
+      }
     }
-
-    // Draw score and wave
-    ctx.fillStyle = "#FFFFFF";
-    ctx.font = "16px monospace";
-    ctx.textAlign = "right";
-    ctx.fillText(
-      `Score: ${state.ui.score}`,
-      canvas.width - padding,
-      padding + 20
-    );
-
-    ctx.fillText(
-      `Wave: ${state.ui.waveNumber}`,
-      canvas.width - padding,
-      padding + 40
-    );
-
-    // Display auto-aim status
-    ctx.fillStyle = "#FFFFFF";
-    ctx.font = "16px monospace";
-    ctx.textAlign = "left";
-    ctx.fillText(
-      `Auto-aim: ${state.autoAimEnabled ? "ON" : "OFF"} (T to toggle)`,
-      20,
-      canvas.height - 20
-    );
   }
 
   /**
@@ -721,40 +1061,268 @@ export class GameLoopState {
     const canvas = this.gameState.getCanvas();
 
     const centerX = canvas.width / 2;
-    const centerY = canvas.height / 2;
+    const centerY = canvas.height / 3; // Move title up to make space for graph
 
-    // Semi-transparent overlay
-    ctx.fillStyle = "rgba(0, 0, 0, 0.7)";
+    // Semi-transparent overlay with dark souls inspired fade
+    ctx.fillStyle = "rgba(0, 0, 0, 0.85)";
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
     // Game over title
-    ctx.fillStyle = "#FFFFFF";
-    ctx.font = "48px monospace";
+    ctx.fillStyle = "#FF0000";
+    ctx.font = "64px monospace";
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
+    ctx.fillText("YOU DIED", centerX, centerY - 30);
 
-    if (state.ui.isGameOver) {
-      ctx.fillText("MISSION COMPLETE", centerX, centerY - 50);
-      ctx.font = "24px monospace";
-      ctx.fillText("You escaped the alien planet", centerX, centerY);
-    } else {
-      ctx.fillText("GAME OVER", centerX, centerY - 50);
-      ctx.font = "24px monospace";
-      ctx.fillText("You were overwhelmed by the aliens", centerX, centerY);
+    // Final stats text
+    ctx.fillStyle = "#AAAAAA";
+    ctx.font = "18px monospace";
+    ctx.textAlign = "center";
+
+    const finalStats = state.ui.finalStats || {
+      time: state.ui.gameTime,
+      score: state.ui.score,
+      wave: state.ui.waveNumber,
+      level: state.ui.playerLevel,
+      kills: state.ui.kills || 0,
+    };
+
+    // Format time as minutes:seconds
+    const minutes = Math.floor(finalStats.time / 60);
+    const seconds = Math.floor(finalStats.time % 60);
+    const timeFormatted = `${minutes}:${seconds.toString().padStart(2, "0")}`;
+
+    ctx.fillText(`Time survived: ${timeFormatted}`, centerX, centerY + 40);
+    ctx.fillText(`Final score: ${finalStats.score}`, centerX, centerY + 70);
+    ctx.fillText(`Waves survived: ${finalStats.wave}`, centerX, centerY + 100);
+    ctx.fillText(`Final level: ${finalStats.level}`, centerX, centerY + 130);
+    ctx.fillText(`Enemies killed: ${finalStats.kills}`, centerX, centerY + 160);
+
+    // Draw performance graph if we have history data
+    if (state.ui.statsHistory && state.ui.statsHistory.length > 0) {
+      this.renderStatsGraph(state, ctx, canvas);
     }
 
-    // Stats
-    ctx.font = "20px monospace";
-    ctx.fillText(`Score: ${state.ui.score}`, centerX, centerY + 50);
-    ctx.fillText(
-      `Waves Survived: ${state.ui.waveNumber}`,
-      centerX,
-      centerY + 80
-    );
+    // Draw restart button
+    const buttonWidth = 200;
+    const buttonHeight = 50;
+    const buttonX = centerX - buttonWidth / 2;
+    const buttonY = canvas.height - 100;
 
-    // Restart prompt
+    // Button background
+    ctx.fillStyle = "#333";
+    ctx.fillRect(buttonX, buttonY, buttonWidth, buttonHeight);
+
+    // Button border
+    ctx.strokeStyle = "#AAA";
+    ctx.lineWidth = 2;
+    ctx.strokeRect(buttonX, buttonY, buttonWidth, buttonHeight);
+
+    // Button text
+    ctx.fillStyle = "#FFF";
+    ctx.font = "24px monospace";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText("RESTART", centerX, buttonY + buttonHeight / 2);
+
+    // Add click event listener for restart button if not already added
+    if (!this._restartButtonAdded) {
+      const canvas = this.gameState.getCanvas();
+      this._restartButtonAdded = true;
+
+      canvas.addEventListener("click", (e) => {
+        if (state.ui.isGameOver) {
+          const rect = canvas.getBoundingClientRect();
+          const clickX = e.clientX - rect.left;
+          const clickY = e.clientY - rect.top;
+
+          if (
+            clickX >= buttonX &&
+            clickX <= buttonX + buttonWidth &&
+            clickY >= buttonY &&
+            clickY <= buttonY + buttonHeight
+          ) {
+            // Restart the game by refreshing the page
+            window.location.reload();
+          }
+        }
+      });
+    }
+  }
+
+  // Track if we've added the restart button event listener
+  private _restartButtonAdded: boolean = false;
+
+  /**
+   * Render the stats graph
+   */
+  private renderStatsGraph(
+    state: GameStateData,
+    ctx: CanvasRenderingContext2D,
+    canvas: HTMLCanvasElement
+  ): void {
+    const graphX = canvas.width * 0.15;
+    const graphY = canvas.height / 2;
+    const graphWidth = canvas.width * 0.7;
+    const graphHeight = canvas.height * 0.25;
+
+    // Get history data
+    const history = state.ui.statsHistory || [];
+    if (history.length < 2) return; // Need at least 2 points to draw a graph
+
+    // Find max values for normalization
+    const maxTime = Math.max(...history.map((point) => point.time));
+    const maxScore = Math.max(...history.map((point) => point.score));
+    const maxKills = Math.max(...history.map((point) => point.kills));
+    const maxLevel = Math.max(...history.map((point) => point.level));
+
+    // Draw graph background
+    ctx.fillStyle = "rgba(30, 30, 30, 0.8)";
+    ctx.fillRect(graphX, graphY, graphWidth, graphHeight);
+
+    // Draw graph border
+    ctx.strokeStyle = "#555";
+    ctx.lineWidth = 1;
+    ctx.strokeRect(graphX, graphY, graphWidth, graphHeight);
+
+    // Draw graph title
+    ctx.fillStyle = "#FFFFFF";
     ctx.font = "16px monospace";
-    ctx.fillText("Refresh the page to play again", centerX, centerY + 150);
+    ctx.textAlign = "center";
+    ctx.fillText("PERFORMANCE OVER TIME", graphX + graphWidth / 2, graphY - 10);
+
+    // Draw axes labels
+    ctx.textAlign = "left";
+    ctx.fillText("Time →", graphX + graphWidth + 10, graphY + graphHeight);
+
+    ctx.textAlign = "center";
+    ctx.fillText("↑", graphX - 15, graphY - 5);
+    ctx.fillText("Value", graphX - 15, graphY + graphHeight / 2);
+
+    // Draw legend
+    const legendX = graphX;
+    const legendY = graphY - 40;
+    const legendSpacing = 80;
+
+    // Health
+    ctx.fillStyle = "#FF0000";
+    ctx.fillRect(legendX, legendY, 15, 2);
+    ctx.fillStyle = "#FFFFFF";
+    ctx.textAlign = "left";
+    ctx.fillText("Health", legendX + 20, legendY + 4);
+
+    // Score
+    ctx.fillStyle = "#00FF00";
+    ctx.fillRect(legendX + legendSpacing, legendY, 15, 2);
+    ctx.fillStyle = "#FFFFFF";
+    ctx.fillText("Score", legendX + legendSpacing + 20, legendY + 4);
+
+    // Kills
+    ctx.fillStyle = "#FFFF00";
+    ctx.fillRect(legendX + legendSpacing * 2, legendY, 15, 2);
+    ctx.fillStyle = "#FFFFFF";
+    ctx.fillText("Kills", legendX + legendSpacing * 2 + 20, legendY + 4);
+
+    // Level
+    ctx.fillStyle = "#00FFFF";
+    ctx.fillRect(legendX + legendSpacing * 3, legendY, 15, 2);
+    ctx.fillStyle = "#FFFFFF";
+    ctx.fillText("Level", legendX + legendSpacing * 3 + 20, legendY + 4);
+
+    // Draw grid lines
+    ctx.strokeStyle = "#333";
+    ctx.lineWidth = 1;
+
+    // Horizontal grid lines
+    for (let i = 0; i <= 4; i++) {
+      const y = graphY + (1 - i / 4) * graphHeight;
+      ctx.beginPath();
+      ctx.moveTo(graphX, y);
+      ctx.lineTo(graphX + graphWidth, y);
+      ctx.stroke();
+    }
+
+    // Vertical grid lines
+    for (let i = 0; i <= 4; i++) {
+      const x = graphX + (i / 4) * graphWidth;
+      ctx.beginPath();
+      ctx.moveTo(x, graphY);
+      ctx.lineTo(x, graphY + graphHeight);
+      ctx.stroke();
+    }
+
+    // Function to get x coordinate for a time point
+    const getX = (time: number) => {
+      return graphX + (time / maxTime) * graphWidth;
+    };
+
+    // Function to get y coordinate for a value
+    const getY = (value: number, max: number) => {
+      // Avoid division by zero
+      if (max === 0) return graphY + graphHeight;
+      return graphY + (1 - value / max) * graphHeight;
+    };
+
+    // Draw health line
+    ctx.strokeStyle = "#FF0000";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    history.forEach((point, i) => {
+      const x = getX(point.time);
+      const y = getY(point.health, 100); // Health max is 100
+
+      if (i === 0) {
+        ctx.moveTo(x, y);
+      } else {
+        ctx.lineTo(x, y);
+      }
+    });
+    ctx.stroke();
+
+    // Draw score line
+    ctx.strokeStyle = "#00FF00";
+    ctx.beginPath();
+    history.forEach((point, i) => {
+      const x = getX(point.time);
+      const y = getY(point.score, maxScore);
+
+      if (i === 0) {
+        ctx.moveTo(x, y);
+      } else {
+        ctx.lineTo(x, y);
+      }
+    });
+    ctx.stroke();
+
+    // Draw kills line
+    ctx.strokeStyle = "#FFFF00";
+    ctx.beginPath();
+    history.forEach((point, i) => {
+      const x = getX(point.time);
+      const y = getY(point.kills, maxKills);
+
+      if (i === 0) {
+        ctx.moveTo(x, y);
+      } else {
+        ctx.lineTo(x, y);
+      }
+    });
+    ctx.stroke();
+
+    // Draw level line
+    ctx.strokeStyle = "#00FFFF";
+    ctx.beginPath();
+    history.forEach((point, i) => {
+      const x = getX(point.time);
+      const y = getY(point.level, maxLevel);
+
+      if (i === 0) {
+        ctx.moveTo(x, y);
+      } else {
+        ctx.lineTo(x, y);
+      }
+    });
+    ctx.stroke();
   }
 
   /**

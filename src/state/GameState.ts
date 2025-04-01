@@ -27,6 +27,7 @@ export enum ActionType {
   TAKE_DAMAGE = "TAKE_DAMAGE",
   UPDATE_ENTITIES = "UPDATE_ENTITIES",
   AUTO_AIM_AND_SHOOT = "AUTO_AIM_AND_SHOOT",
+  LEVEL_UP = "LEVEL_UP",
 }
 
 // Action interfaces
@@ -174,6 +175,8 @@ export class CentralGameState {
         playerLevel: 1,
         playerXp: 0,
         xpForNextLevel: 100, // Base XP needed for level 2
+        kills: 0,
+        statsHistory: [],
       },
       isPaused: false,
       autoAimEnabled: true,
@@ -262,17 +265,36 @@ export class CentralGameState {
 
   // Dispatcher
   private dispatch(action: Action): void {
-    // Apply the action to update state
-    this.state = this.reducer(this.state, action);
+    try {
+      // Apply the action to update state
+      this.state = this.reducer(this.state, action);
 
-    // Notify subscribers
-    if (this.callbacks[action.type]) {
-      this.callbacks[action.type].forEach((callback) => callback(this.state));
-    }
+      // Notify subscribers
+      if (this.callbacks[action.type]) {
+        this.callbacks[action.type].forEach((callback) => {
+          try {
+            callback(this.state);
+          } catch (error) {
+            console.error(
+              `Error in callback for action type ${action.type}:`,
+              error
+            );
+          }
+        });
+      }
 
-    // Always notify global subscribers
-    if (this.callbacks["*"]) {
-      this.callbacks["*"].forEach((callback) => callback(this.state));
+      // Always notify global subscribers
+      if (this.callbacks["*"]) {
+        this.callbacks["*"].forEach((callback) => {
+          try {
+            callback(this.state);
+          } catch (error) {
+            console.error(`Error in global callback:`, error);
+          }
+        });
+      }
+    } catch (error) {
+      console.error(`Error dispatching action ${action.type}:`, error);
     }
   }
 
@@ -330,6 +352,9 @@ export class CentralGameState {
           state,
           action as AutoAimAndShootAction
         );
+
+      case ActionType.LEVEL_UP:
+        return this.handleLevelUp(state);
 
       default:
         return state;
@@ -420,7 +445,7 @@ export class CentralGameState {
     action: SwitchWeaponAction
   ): GameStateData {
     const { weaponType } = action.payload;
-    state.player.setActiveWeapon(weaponType);
+    state.player.switchWeapon(weaponType);
     return state;
   }
 
@@ -429,7 +454,7 @@ export class CentralGameState {
     action: UpdateWeaponStatsAction
   ): GameStateData {
     const { stats } = action.payload;
-    state.player.updateWeaponStats(stats);
+    state.player.updateWeapon(stats);
     return {
       ...state,
       currentWeaponStats: stats,
@@ -463,7 +488,7 @@ export class CentralGameState {
     const newState = { ...state };
 
     // Update player
-    state.player.update(deltaTime, timestamp);
+    state.player.update(deltaTime);
 
     // Update projectiles
     const updatedProjectiles = this.updateProjectiles(state, deltaTime);
@@ -498,6 +523,9 @@ export class CentralGameState {
         continue;
       }
 
+      // Flag to track if projectile hit an enemy this frame
+      let hitEnemyThisFrame = false;
+
       // Check collision with enemies
       for (const enemy of state.enemies) {
         if (!enemy.active) continue;
@@ -509,8 +537,19 @@ export class CentralGameState {
         // Simple circular collision
         if (distance < 15) {
           // Enemy radius
+          // Deal damage to enemy
           enemy.takeDamage(projectile.damage);
-          projectile.deactivate();
+
+          // Mark that we hit an enemy this frame
+          hitEnemyThisFrame = true;
+
+          // Reduce pierce count
+          projectile.pierce--;
+
+          // Only deactivate if pierce count is 0 or less
+          if (projectile.pierce <= 0) {
+            projectile.deactivate();
+          }
 
           // Add score and XP for hit
           if (!enemy.active) {
@@ -525,7 +564,11 @@ export class CentralGameState {
             this.checkForLevelUp(state.ui);
           }
 
-          break;
+          // If projectile is deactivated or we've hit an enemy this frame, stop checking more enemies
+          // This ensures a projectile only hits one enemy per frame
+          if (!projectile.active || hitEnemyThisFrame) {
+            break;
+          }
         }
       }
     }
@@ -638,7 +681,7 @@ export class CentralGameState {
 
   /**
    * Check if player has enough XP to level up
-   * Uses an exponential curve for level requirements
+   * Uses a 50% increase for level requirements
    */
   private checkForLevelUp(ui: GameUIState): void {
     while (ui.playerXp >= ui.xpForNextLevel) {
@@ -648,14 +691,8 @@ export class CentralGameState {
       // Subtract the XP used for this level
       ui.playerXp -= ui.xpForNextLevel;
 
-      // Calculate new XP requirement with exponential scaling
-      // Formula: baseXP * (growthFactor^(level-1))
-      // This gives us: Level 1->2: 100 XP, 2->3: 200 XP, 3->4: 400 XP, etc.
-      const baseXP = 100;
-      const growthFactor = 2;
-      ui.xpForNextLevel = Math.round(
-        baseXP * Math.pow(growthFactor, ui.playerLevel - 1)
-      );
+      // Calculate new XP requirement with 50% increase
+      ui.xpForNextLevel = Math.round(ui.xpForNextLevel * 1.5);
 
       // Apply level-up bonuses to player
       this.applyLevelUpBonuses(ui.playerLevel);
@@ -689,19 +726,14 @@ export class CentralGameState {
 
         // Reload time: -3% per level (faster reloading)
         stats.reloadTime *= 1 - 0.03 * level;
-        stats.reloadTime = Math.max(0.2, stats.reloadTime); // Minimum reload time
+
+        // Pierce: +10% per level (more penetration)
+        stats.pierce *= 1 + 0.1 * level;
 
         // Update the weapon with new stats
         state.player.updateWeapon(stats);
       });
     }
-
-    // Add level up notification
-    this.addNotification(
-      `LEVEL UP! You are now level ${level}`,
-      "#00AAFF",
-      5000
-    );
 
     console.log(`Level Up! You are now level ${level}`);
   }
@@ -720,5 +752,10 @@ export class CentralGameState {
     };
 
     this.state.notifications.push(notification);
+  }
+
+  private handleLevelUp(state: GameStateData): GameStateData {
+    // Implement level up logic
+    return state;
   }
 }

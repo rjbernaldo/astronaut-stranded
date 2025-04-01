@@ -16,34 +16,23 @@ export interface ProjectileOptions {
   damage: number;
   range: number;
   speed: number;
+  pierce?: number;
 }
 
 export interface WeaponStats {
   name: string;
   damage: number;
-  fireRate: number;
-  accuracy: number;
-  range: number;
-  projectileSpeed: number;
-  projectileSize: number;
-  knockback: number;
-  ammoCapacity: number;
-  reloadTime: number;
   magazineSize: number;
   reserveAmmo: number;
+  fireRate: number;
+  reloadTime: number;
   projectileCount: number;
-  spread: number;
-  recoil: number;
+  range: number;
+  projectileSpeed: number;
+  pierce: number;
+  ammoCapacity: number;
   customized?: boolean;
-  parts?: {
-    barrel?: string;
-    slide?: string;
-    frame?: string;
-    trigger?: string;
-    magazine?: string;
-    internal?: string;
-  };
-  // Add more properties as needed
+  parts?: Partial<Record<PartCategory, string>>;
 }
 
 export type EnemyType = "Scout" | "Brute" | "Spitter";
@@ -68,54 +57,39 @@ export interface Notification {
   duration: number;
 }
 
+// Define a stat history point for tracking stats over time
+export interface StatHistoryPoint {
+  time: number;
+  health: number;
+  score: number;
+  kills: number;
+  level: number;
+}
+
+// Define final game stats
+export interface FinalGameStats {
+  time: number;
+  score: number;
+  wave: number;
+  level: number;
+  kills: number;
+  history: StatHistoryPoint[];
+}
+
+// Update the GameState interface to include all the UI properties we're using
 export interface GameState {
-  // Player state
-  player: any; // Will be the Astronaut instance
-
-  // Camera position
-  cameraPosition: Position;
-
-  // Entities
-  enemies: any[]; // Will be Enemy instances
-  projectiles: any[]; // Will be Projectile instances
-
-  // Map
-  map: any; // Will be GameMap instance
-
-  // Input state
-  keysPressed: Set<string>;
-  mousePosition: Position;
-  mouseDown: boolean;
-
-  // Game state
-  isPaused: boolean;
-
-  // Auto-aim
-  autoAimEnabled: boolean;
-
-  // Weapon stats
-  currentWeaponStats: WeaponStats | null;
-
-  // UI state
-  ui: {
-    score: number;
-    waveNumber: number;
-    difficultyLevel: number;
-    gameTime: number;
-    nextLevelTime: number;
-    isGameOver: boolean;
-    playerLevel: number;
-    playerXp: number;
-    xpForNextLevel: number;
-  };
-
-  // Enemy spawning
-  lastEnemySpawnTime: number;
-  enemySpawnInterval: number;
-  enemySpawnCount: number;
-
-  // Notifications
-  notifications: Notification[];
+  score: number;
+  isGameOver: boolean;
+  waveNumber: number;
+  difficultyLevel: number;
+  gameTime: number;
+  nextLevelTime: number;
+  playerLevel: number;
+  playerXp: number;
+  xpForNextLevel: number;
+  kills: number;
+  statsHistory: StatHistoryPoint[];
+  finalStats?: FinalGameStats;
 }
 
 export interface UIState {
@@ -128,4 +102,25 @@ export interface UIState {
   playerLevel: number;
   playerXp: number;
   xpForNextLevel: number;
+}
+
+export type WeaponType = "pistol" | "rifle" | "shotgun";
+
+export type PartCategory =
+  | "barrel"
+  | "slide"
+  | "frame"
+  | "trigger"
+  | "magazine"
+  | "internal";
+
+// Stats interface for gun customization with strict typing
+export interface GunCustomizationStats {
+  damage: number;
+  range: number;
+  fireRate: number;
+  magazineSize: number;
+  reloadTime: number;
+  pierce: number;
+  projectileCount: number;
 }

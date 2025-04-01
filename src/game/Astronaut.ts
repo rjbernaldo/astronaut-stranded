@@ -1,5 +1,6 @@
 import { Direction, Position, WeaponStats } from "../types";
 import { Weapon } from "./Weapon";
+import { INITIAL_WEAPON_STATS } from "../constants/weaponStats";
 
 // Interface for tracking ejected bullet animations
 interface EjectedBullet {
@@ -8,6 +9,10 @@ interface EjectedBullet {
   progress: number; // 0 to 1 animation progress
   rotation: number; // Current rotation angle in degrees
   initialVelocity: { x: number; y: number }; // Initial velocity for arc trajectory
+  position: { x: number; y: number }; // Current position
+  bounced: boolean; // Has the bullet hit the edge of the canvas?
+  opacity: number; // Opacity for fade out effect
+  gravity: number; // Gravity effect
 }
 
 export class Astronaut {
@@ -24,6 +29,8 @@ export class Astronaut {
   lastFireTime: number;
   ejectedBullets: EjectedBullet[]; // Track recently fired bullets for animation
   reloadStartTime: number | null; // Track when reload started
+  movementVector: { x: number; y: number };
+  walkingTime: number;
 
   constructor(
     startPosition: Position,
@@ -35,67 +42,50 @@ export class Astronaut {
     this.reserves = new Map();
     this.lightRadius = 450; // Fixed high visibility radius
     this.rotation = 0;
-    this.speed = 50;
+    this.speed = 75; // Increased from 50 to 75 for faster movement
     this.activeWeapon = null;
     this.weapons = new Map();
     this.reloading = false;
     this.lastFireTime = 0;
     this.ejectedBullets = []; // Initialize empty array for ejected bullets
     this.reloadStartTime = null;
+    this.movementVector = { x: 0, y: 0 };
+    this.walkingTime = 0;
 
     // Initialize default weapons if no custom weapon provided
     if (!initialWeaponStats) {
       this.addWeapon("pistol", {
         name: "pistol",
-        damage: 10,
-        magazineSize: 7,
-        reserveAmmo: Infinity, // Unlimited ammo reserves
-        fireRate: 0.5,
-        reloadTime: 2,
-        recoil: 5,
-        projectileCount: 1,
-        spread: 0,
-        accuracy: 95,
-        range: 500,
+        ...INITIAL_WEAPON_STATS,
         projectileSpeed: 10,
-        projectileSize: 3,
-        knockback: 2,
-        ammoCapacity: 7,
+        reserveAmmo: Infinity,
+        ammoCapacity: INITIAL_WEAPON_STATS.magazineSize,
       });
 
       this.addWeapon("rifle", {
         name: "rifle",
-        damage: 15,
+        ...INITIAL_WEAPON_STATS,
+        damage: INITIAL_WEAPON_STATS.damage * 1.5,
+        range: INITIAL_WEAPON_STATS.range * 1.4,
         magazineSize: 30,
-        reserveAmmo: Infinity, // Unlimited ammo reserves
         fireRate: 0.1,
-        reloadTime: 3,
-        recoil: 3,
-        projectileCount: 1,
-        spread: 3,
-        accuracy: 85,
-        range: 700,
         projectileSpeed: 15,
-        projectileSize: 2,
-        knockback: 1,
+        projectileCount: INITIAL_WEAPON_STATS.projectileCount * 2,
+        reserveAmmo: Infinity,
         ammoCapacity: 30,
       });
 
       this.addWeapon("shotgun", {
         name: "shotgun",
-        damage: 8,
+        ...INITIAL_WEAPON_STATS,
+        damage: INITIAL_WEAPON_STATS.damage * 0.8,
+        range: INITIAL_WEAPON_STATS.range * 0.6,
         magazineSize: 6,
-        reserveAmmo: Infinity, // Unlimited ammo reserves
-        fireRate: 1,
-        reloadTime: 0.8,
-        recoil: 10,
+        fireRate: 1.0,
         projectileCount: 5,
-        spread: 15,
-        accuracy: 70,
-        range: 300,
         projectileSpeed: 8,
-        projectileSize: 4,
-        knockback: 5,
+        pierce: INITIAL_WEAPON_STATS.pierce * 2.5,
+        reserveAmmo: Infinity,
         ammoCapacity: 6,
       });
 
@@ -154,7 +144,13 @@ export class Astronaut {
     const weaponName = this.activeWeapon.stats.name;
     const currentAmmo = this.ammo.get(weaponName) || 0;
 
-    if (currentAmmo <= 0 || this.reloading) return false;
+    if (currentAmmo <= 0) {
+      // Auto reload when out of ammo
+      this.reload();
+      return false;
+    }
+
+    if (this.reloading) return false;
 
     // Check fire rate
     const elapsedTime = (timestamp - this.lastFireTime) / 1000;
@@ -166,9 +162,10 @@ export class Astronaut {
 
     // Add ejected bullet animation with random initial velocity
     // This creates a slightly different arc each time
-    const randomAngle = this.rotation + 90 + (Math.random() * 30 - 15); // Eject perpendicular to gun with random variance
+    // Use a fixed angle towards top-right (315 degrees) with less variance
+    const randomAngle = 315 + (Math.random() * 15 - 7.5); // Top-right = 315 degrees with less variance
     const radians = (randomAngle * Math.PI) / 180;
-    const speed = 2 + Math.random() * 1; // Random initial speed
+    const speed = 6 + Math.random() * 3; // Much higher initial speed for stronger ejection
 
     this.ejectedBullets.push({
       timestamp,
@@ -179,10 +176,17 @@ export class Astronaut {
         x: Math.cos(radians) * speed,
         y: Math.sin(radians) * speed,
       },
+      position: {
+        x: 0,
+        y: 0,
+      },
+      bounced: false,
+      opacity: 1.0,
+      gravity: 0.5 + Math.random() * 0.2, // Significantly increased gravity for more realistic physics
     });
 
-    // Apply recoil
-    this.rotation += (Math.random() * 2 - 1) * this.activeWeapon.stats.recoil;
+    // Apply a small random rotation effect (simulating recoil)
+    this.rotation += (Math.random() * 2 - 1) * 0.4;
 
     return true;
   }
@@ -216,21 +220,65 @@ export class Astronaut {
     this.health = Math.max(0, this.health - amount);
   }
 
-  update(deltaTime: number, timestamp: number): void {
-    // Update ejected bullet animations
-    for (let i = this.ejectedBullets.length - 1; i >= 0; i--) {
-      const bullet = this.ejectedBullets[i];
+  update(deltaTime: number): void {
+    // If there's no active weapon, exit early
+    if (!this.activeWeapon) return;
 
-      // Update animation progress (animations last 0.3 seconds - faster than before)
-      bullet.progress += deltaTime / 0.3;
+    // Check if we need to reload automatically (when magazine is empty)
+    const currentAmmo = this.ammo.get(this.activeWeapon.stats.name) || 0;
+    if (currentAmmo === 0 && !this.reloading && this.activeWeapon) {
+      this.reload();
+    }
 
-      // Update rotation (spin effect)
-      bullet.rotation += deltaTime * 720; // 720 degrees per second = 2 full rotations/second
+    // Handle reloading progress
+    if (this.reloading && this.activeWeapon && this.reloadStartTime !== null) {
+      const reloadTime = this.activeWeapon.stats.reloadTime * 1000; // Convert to ms
+      const currentTime = performance.now();
+      const elapsedTime = currentTime - this.reloadStartTime;
 
-      // Remove completed animations
-      if (bullet.progress >= 1) {
-        this.ejectedBullets.splice(i, 1);
+      if (elapsedTime >= reloadTime) {
+        // Reload complete
+        const weaponName = this.activeWeapon.stats.name;
+        const magazineSize = this.activeWeapon.stats.magazineSize;
+
+        this.ammo.set(weaponName, magazineSize);
+        this.reloading = false;
+        this.reloadStartTime = null; // Reset reload start time
       }
+    }
+
+    // Handle ejected bullet animation
+    this.updateEjectedBullets(deltaTime);
+
+    // Update movement vector based on direction
+    if (this.movementVector.x !== 0 || this.movementVector.y !== 0) {
+      // Normalize the vector for consistent speed in all directions
+      const length = Math.sqrt(
+        this.movementVector.x * this.movementVector.x +
+          this.movementVector.y * this.movementVector.y
+      );
+      this.movementVector.x /= length;
+      this.movementVector.y /= length;
+
+      // Apply the speed
+      this.movementVector.x *= this.speed;
+      this.movementVector.y *= this.speed;
+
+      // Update position
+      this.position.x += this.movementVector.x * deltaTime;
+      this.position.y += this.movementVector.y * deltaTime;
+
+      // Reset movement vector
+      this.movementVector.x = 0;
+      this.movementVector.y = 0;
+    }
+
+    // Movement-based animation
+    if (this.movementVector.x !== 0 || this.movementVector.y !== 0) {
+      this.walkingTime += deltaTime;
+    } else {
+      // Reset walking animation when stationary
+      this.walkingTime = 0;
     }
   }
 
@@ -247,5 +295,38 @@ export class Astronaut {
   // Get ejected bullets for animation
   getEjectedBullets(): EjectedBullet[] {
     return this.ejectedBullets;
+  }
+
+  updateEjectedBullets(deltaTime: number): void {
+    // Update ejected bullet animations
+    for (let i = this.ejectedBullets.length - 1; i >= 0; i--) {
+      const bullet = this.ejectedBullets[i];
+
+      // Update animation progress (animations last 2 seconds - longer for physics simulation)
+      bullet.progress += deltaTime / 2.0;
+
+      // Update rotation (spin effect) - we'll let the rotation continue until it's set to 90 in the rendering code
+      // This ensures bullets can rotate freely until they hit the ground
+      if (bullet.rotation !== 90) {
+        bullet.rotation += deltaTime * 720; // 720 degrees per second = 2 full rotations/second
+      }
+
+      // Apply physics - calculate new position based on velocity and gravity
+      bullet.initialVelocity.y += bullet.gravity * deltaTime * 15; // Increased gravity effect
+
+      // Update position - each bullet has its own independent position
+      bullet.position.x += bullet.initialVelocity.x * deltaTime * 60;
+      bullet.position.y += bullet.initialVelocity.y * deltaTime * 60;
+
+      // Gradually fade out the bullet
+      if (bullet.progress > 0.7) {
+        bullet.opacity = Math.max(0, 1 - (bullet.progress - 0.7) / 0.3);
+      }
+
+      // Remove completed animations
+      if (bullet.progress >= 1) {
+        this.ejectedBullets.splice(i, 1);
+      }
+    }
   }
 }

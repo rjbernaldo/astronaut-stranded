@@ -117,8 +117,8 @@
 }
 
 /* Upgrades section */
-.upgrades-section {
-  margin-bottom: 8px;
+.upgrade-section {
+  margin-bottom: 20px;
   background-color: #252525;
   border-radius: 5px;
   padding: 8px;
@@ -388,4 +388,15 @@
 .level-up-customization {
   border: 3px solid #00aaff;
   box-shadow: 0 0 20px rgba(0, 170, 255, 0.5);
+}
+
+/* Instructions for selecting parts */
+.upgrade-instructions {
+  text-align: center;
+  color: #aaa;
+  font-size: 14px;
+  margin-bottom: 15px;
+  padding: 5px;
+  background-color: rgba(0, 0, 0, 0.2);
+  border-radius: 4px;
 }

@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from "react";
 import GameCanvas, { GameCanvasRef } from "../components/GameCanvas";
 import { WeaponStats } from "../types";
 import GunCustomization from "../components/GunCustomization";
+import { INITIAL_WEAPON_STATS } from "../constants/weaponStats";
 import "./gun-customization.css";
 
 type PartCategory =
@@ -15,22 +16,36 @@ type PartCategory =
   | "internal";
 
 export default function Home() {
-  const [gameStarted, setGameStarted] = useState(false);
-  const [showGunCustomization, setShowGunCustomization] = useState(false);
+  const isBrowser = typeof window !== "undefined";
+  const [isGameStarted, setIsGameStarted] = useState(false);
+  const [isGamePaused, setIsGamePaused] = useState(false);
+  const [isCustomizationOpen, setIsCustomizationOpen] = useState(false);
+  const [isLevelUp, setIsLevelUp] = useState(false);
+  const [availableCredits, setAvailableCredits] = useState(200);
   const [gameLoaded, setGameLoaded] = useState(false);
-  const [isLevelUpCustomization, setIsLevelUpCustomization] = useState(false);
+  const [initialWeaponStats, setInitialWeaponStats] = useState<WeaponStats>({
+    name: "pistol",
+    damage: INITIAL_WEAPON_STATS.damage,
+    magazineSize: INITIAL_WEAPON_STATS.magazineSize,
+    reserveAmmo: Infinity,
+    fireRate: INITIAL_WEAPON_STATS.fireRate,
+    reloadTime: INITIAL_WEAPON_STATS.reloadTime,
+    projectileCount: 1,
+    range: INITIAL_WEAPON_STATS.range,
+    projectileSpeed: 10,
+    pierce: INITIAL_WEAPON_STATS.pierce,
+    ammoCapacity: INITIAL_WEAPON_STATS.magazineSize, // Initial magazine capacity
+  });
   const gameCanvasRef = useRef<GameCanvasRef>(null);
   const [weaponStats, setWeaponStats] = useState<WeaponStats>({
     name: "pistol",
-    damage: 10,
-    magazineSize: 7,
-    reserveAmmo: 21,
-    fireRate: 0.5,
-    reloadTime: 2.0,
-    recoil: 5,
+    damage: INITIAL_WEAPON_STATS.damage,
+    magazineSize: INITIAL_WEAPON_STATS.magazineSize,
+    reserveAmmo: INITIAL_WEAPON_STATS.magazineSize * 3,
+    fireRate: INITIAL_WEAPON_STATS.fireRate,
+    reloadTime: INITIAL_WEAPON_STATS.reloadTime,
     projectileCount: 1,
-    spread: 0,
-    range: 300,
+    range: INITIAL_WEAPON_STATS.range,
     customized: false,
     parts: {
       barrel: "standard-barrel",
@@ -40,34 +55,37 @@ export default function Home() {
       magazine: "standard-magazine",
       internal: "standard-internal",
     },
+    projectileSpeed: 10,
+    pierce: INITIAL_WEAPON_STATS.pierce,
+    ammoCapacity: INITIAL_WEAPON_STATS.magazineSize,
   });
 
   // Pause the game when the customization modal is shown
   useEffect(() => {
     if (gameCanvasRef.current && gameLoaded) {
-      if (showGunCustomization) {
+      if (isCustomizationOpen) {
         // Pause the game when customization modal opens
         gameCanvasRef.current.pause();
       } else {
         // Only resume if the game was previously started
-        if (gameStarted) {
+        if (isGameStarted) {
           gameCanvasRef.current.resume();
         }
       }
     }
-  }, [showGunCustomization, gameLoaded, gameStarted]);
+  }, [isCustomizationOpen, gameLoaded, isGameStarted]);
 
   // When game changes to started state, make sure to resume if paused
   useEffect(() => {
     if (
-      gameStarted &&
+      isGameStarted &&
       gameCanvasRef.current &&
       gameLoaded &&
-      !showGunCustomization
+      !isCustomizationOpen
     ) {
       gameCanvasRef.current.resume();
     }
-  }, [gameStarted, gameLoaded, showGunCustomization]);
+  }, [isGameStarted, gameLoaded, isCustomizationOpen]);
 
   // Set the level up callback after game is loaded
   useEffect(() => {
@@ -77,66 +95,72 @@ export default function Home() {
   }, [gameLoaded]);
 
   const handleStartGame = () => {
-    setGameStarted(true);
+    setIsGameStarted(true);
   };
 
   const handleLevelUp = () => {
-    setIsLevelUpCustomization(true);
-    setShowGunCustomization(true);
+    setIsLevelUp(true);
+    setIsCustomizationOpen(true);
   };
 
   const handleCustomizeWeapon = () => {
-    if (!gameStarted) {
+    if (!isGameStarted) {
       // Start the game first if not already started
-      setGameStarted(true);
+      setIsGameStarted(true);
+
+      // Show level-up style customization for first-time upgrade
+      setIsLevelUp(true);
+    } else {
+      // Regular customization during gameplay
+      setIsLevelUp(false);
     }
 
     // Show the customization modal
-    setIsLevelUpCustomization(false);
-    setShowGunCustomization(true);
+    setIsCustomizationOpen(true);
   };
 
   const handleSaveCustomization = (
     equippedParts: Partial<Record<PartCategory, string>>,
     finalStats: WeaponStats
   ) => {
-    setWeaponStats(finalStats);
-    setShowGunCustomization(false);
-    setIsLevelUpCustomization(false);
-
-    // Update the weapon in the game
+    // Update the weapon in the game first, before updating state
     if (gameCanvasRef.current && gameLoaded) {
       gameCanvasRef.current.updateWeapon(finalStats);
     }
+
+    // Update state after game update
+    setWeaponStats(finalStats);
+    setIsCustomizationOpen(false);
+    setIsLevelUp(false);
   };
 
   const handleCancelCustomization = () => {
-    setShowGunCustomization(false);
-    setIsLevelUpCustomization(false);
-
-    // If we were in a level-up customization, we need to apply default bonuses
-    if (isLevelUpCustomization && gameCanvasRef.current && gameLoaded) {
-      // Apply default level up bonuses - we'll just update the current weapon with slight improvements
-      const improvedStats = { ...weaponStats };
-      improvedStats.damage *= 1.05; // 5% damage increase
-      improvedStats.fireRate *= 0.98; // 2% faster firing
-      improvedStats.reloadTime *= 0.97; // 3% faster reload
-      gameCanvasRef.current.updateWeapon(improvedStats);
-      setWeaponStats(improvedStats);
+    // If this is a level-up customization, don't allow cancellation
+    if (isLevelUp) {
+      return; // Don't close the modal - force player to make a choice
     }
+
+    // Only close if not a level-up customization
+    setIsCustomizationOpen(false);
+    setIsLevelUp(false);
   };
 
   const handleGameLoaded = () => {
     setGameLoaded(true);
+
+    // Initial weapon setup - only once when the game is first loaded
+    if (gameCanvasRef.current) {
+      console.log("Game loaded - updating initial weapon stats");
+      gameCanvasRef.current.updateWeapon(weaponStats);
+    }
   };
 
   return (
     <>
-      {/* Game canvas - always render when game is started */}
-      {gameStarted && (
+      {/* Game canvas */}
+      {isGameStarted && (
         <GameCanvas
           ref={gameCanvasRef}
-          initialWeaponStats={weaponStats}
           onLoaded={handleGameLoaded}
           onLevelUp={handleLevelUp}
         />
@@ -147,21 +171,19 @@ export default function Home() {
         initialWeaponStats={weaponStats}
         onSave={handleSaveCustomization}
         onCancel={handleCancelCustomization}
-        isOpen={showGunCustomization}
-        availableCredits={1000}
-        title={
-          isLevelUpCustomization ? "LEVEL UP! Choose your upgrade" : undefined
-        }
+        isOpen={isCustomizationOpen}
+        availableCredits={availableCredits}
+        title={isLevelUp ? "LEVEL UP! Choose your upgrade" : undefined}
         message={
-          isLevelUpCustomization
+          isLevelUp
             ? "You've gained a level! Choose how to upgrade your weapon:"
             : undefined
         }
-        isLevelUpCustomization={isLevelUpCustomization}
+        isLevelUpCustomization={isLevelUp}
       />
 
       {/* Main UI - only show when game is not started */}
-      {!gameStarted && (
+      {!isGameStarted && (
         <main className="flex min-h-screen flex-col items-center justify-center p-8 bg-black text-white font-mono">
           <div className="max-w-3xl w-full bg-gray-900 p-8 rounded-lg border border-gray-800">
             <h1 className="text-4xl font-bold mb-6 text-center">
@@ -208,6 +230,7 @@ export default function Home() {
               </ul>
             </div>
 
+            {/* Weapon stats display */}
             {weaponStats && (
               <div className="mb-6">
                 <h2 className="text-2xl mb-3 text-green-400">
@@ -230,18 +253,12 @@ export default function Home() {
               </div>
             )}
 
-            <div className="flex flex-col sm:flex-row gap-4 justify-center">
+            <div className="flex justify-center">
               <button
                 onClick={handleCustomizeWeapon}
-                className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-md transition-colors"
-              >
-                Customize Weapon
-              </button>
-              <button
-                onClick={handleStartGame}
                 className="px-6 py-3 bg-green-600 hover:bg-green-700 text-white rounded-md transition-colors"
               >
-                Start Mission
+                START MISSION
               </button>
             </div>
           </div>
@@ -249,13 +266,13 @@ export default function Home() {
       )}
 
       {/* Game UI controls when game is running */}
-      {gameStarted && (
+      {isGameStarted && (
         <div className="fixed top-4 right-4 z-10">
           <button
             onClick={handleCustomizeWeapon}
             className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md transition-colors"
           >
-            Customize Weapon
+            Upgrade Weapon
           </button>
         </div>
       )}

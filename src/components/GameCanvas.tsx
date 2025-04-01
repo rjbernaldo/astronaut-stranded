@@ -4,7 +4,7 @@ import React, {
   useImperativeHandle,
   forwardRef,
 } from "react";
-import { GameLoop } from "../game/GameLoop";
+import { GameLoopState } from "../game/GameLoopState";
 import { WeaponStats } from "../types";
 
 interface GameCanvasProps {
@@ -29,7 +29,7 @@ const GameCanvas = forwardRef<GameCanvasRef, GameCanvasProps>(
     ref
   ) => {
     const canvasRef = useRef<HTMLCanvasElement>(null);
-    const gameLoopRef = useRef<GameLoop | null>(null);
+    const gameLoopRef = useRef<GameLoopState | null>(null);
     const initializedRef = useRef(false);
 
     // Expose methods via the ref
@@ -65,13 +65,14 @@ const GameCanvas = forwardRef<GameCanvasRef, GameCanvasProps>(
       canvas.height = height;
 
       const seed = Math.random().toString();
-      const gameLoop = new GameLoop(
-        canvas,
-        seed,
-        initialWeaponStats,
-        onLevelUp
-      );
+      const gameLoop = new GameLoopState(canvas, seed, initialWeaponStats);
       gameLoopRef.current = gameLoop;
+
+      // Set the level up callback if provided
+      if (onLevelUp) {
+        gameLoop.setOnLevelUpCallback(onLevelUp);
+      }
+
       gameLoop.start();
       initializedRef.current = true;
 
@@ -85,7 +86,7 @@ const GameCanvas = forwardRef<GameCanvasRef, GameCanvasProps>(
         gameLoopRef.current = null;
         initializedRef.current = false;
       };
-    }, [onLevelUp]);
+    }, []);
 
     // Handle canvas size updates separately
     useEffect(() => {
@@ -95,13 +96,6 @@ const GameCanvas = forwardRef<GameCanvasRef, GameCanvasProps>(
       canvas.width = width;
       canvas.height = height;
     }, [width, height]);
-
-    // Handle weapon stats updates separately
-    useEffect(() => {
-      if (gameLoopRef.current && initialWeaponStats && initializedRef.current) {
-        gameLoopRef.current.updateWeapon(initialWeaponStats);
-      }
-    }, [initialWeaponStats]);
 
     return (
       <canvas
