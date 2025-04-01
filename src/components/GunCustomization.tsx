@@ -570,6 +570,11 @@ export const GunCustomization: React.FC<GunCustomizationProps> = ({
   const [previewStats, setPreviewStats] =
     useState<GunCustomizationStats | null>(null);
 
+  // Add state for preview game stats
+  const [previewGameStats, setPreviewGameStats] = useState<WeaponStats | null>(
+    null
+  );
+
   // Generate random parts when component mounts OR when the modal opens
   useEffect(() => {
     if (isOpen) {
@@ -596,15 +601,21 @@ export const GunCustomization: React.FC<GunCustomizationProps> = ({
   // Apply parts additively (cumulative effects)
   const computeWeaponStats = (
     baseStats: GunCustomizationStats,
-    upgradePart: GunPart | null,
-    partsToUse: Record<PartCategory, string> = equippedParts
+    partsToUse: Partial<Record<PartCategory, string>> = equippedParts
   ): WeaponStats => {
     // Clone the base stats to avoid modifying the original
     const newStats = { ...baseStats };
 
-    // If we have an upgrade part, apply its stats additively
-    if (upgradePart) {
-      upgradePart.stats.forEach((statItem) => {
+    // Get all parts we need to apply
+    const partsToApply = Object.entries(partsToUse)
+      .map(([category, partId]) => {
+        return gunParts.find((p) => p.id === partId);
+      })
+      .filter((part): part is GunPart => part !== undefined);
+
+    // Apply each part's stats additively
+    partsToApply.forEach((part) => {
+      part.stats.forEach((statItem) => {
         let statKey = statItem.name;
         let statValue = statItem.value;
 
@@ -624,7 +635,7 @@ export const GunCustomization: React.FC<GunCustomizationProps> = ({
           }
         }
       });
-    }
+    });
 
     // Apply bounds to stats with new maximums from constants
     newStats.reloadTime = Math.max(
@@ -2202,13 +2213,13 @@ export const GunCustomization: React.FC<GunCustomizationProps> = ({
     potentialStats.pierce = potentialStats.pierce || 1;
 
     // Calculate preview stats with the potential change
-    const previewGameStats = computeWeaponStats(potentialStats, {
+    const calculatedPreviewGameStats = computeWeaponStats(potentialStats, {
       ...equippedParts,
       [part.category]: part.id,
     });
 
     setPreviewStats(potentialStats);
-    setPreviewGameStats(previewGameStats);
+    setPreviewGameStats(calculatedPreviewGameStats);
   };
 
   // Only render if modal is open
